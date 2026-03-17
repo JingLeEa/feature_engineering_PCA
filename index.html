@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PCA Learning Tool</title>
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      body { background: #fafaf9; }
+
+      input[type="range"] {
+        -webkit-appearance: none;
+        height: 4px;
+        background: rgba(0,0,0,0.12);
+        border-radius: 2px;
+        outline: none;
+      }
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 18px; height: 18px;
+        border-radius: 50%;
+        background: #1a1a1a;
+        cursor: pointer;
+        border: 2px solid white;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+      }
+      @media (prefers-color-scheme: dark) {
+        body { background: #0f0f0f; }
+        input[type="range"] { background: rgba(255,255,255,0.15); }
+        input[type="range"]::-webkit-slider-thumb { background: #f0f0f0; border-color: #1a1a1a; }
+      }
+
+      button {
+        font-family: system-ui, sans-serif;
+        font-size: 13px;
+        padding: 6px 14px;
+        border-radius: 8px;
+        border: 0.5px solid rgba(0,0,0,0.15);
+        background: transparent;
+        color: #1a1a1a;
+        cursor: pointer;
+        transition: background 0.15s;
+      }
+      button:hover { background: rgba(0,0,0,0.05); }
+      @media (prefers-color-scheme: dark) {
+        button { color: #f0f0f0; border-color: rgba(255,255,255,0.15); }
+        button:hover { background: rgba(255,255,255,0.06); }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/index.jsx"></script>
+  </body>
+</html>

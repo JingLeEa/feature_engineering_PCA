@@ -1,0 +1,780 @@
+import { useState, useRef, useEffect, useMemo } from "react";
+import { SHAPES } from "../math/shapes3d.js";
+import { computePCA3D, projectPoints3D, mean, varianceOf } from "../math/pca.js";
+import { setupCanvas } from "../components/canvas/canvasUtils.js";
+import { Callout, Divider, MetricCard } from "../components/ui/primitives.jsx";
+
+const GOLD  = "#F5A623";
+const BLUE  = "#4F8CFF";
+const GREEN = "#1D9E75";
+const RED   = "#E85D24";
+const TEAL  = "#17a89e";
+
+// ─── SIMPLE 3D → 2D ISOMETRIC PROJECTION ─────────────────────────────────────
+
+function iso(x, y, z, scale = 55, ox = 0, oy = 0) {
+  // Standard isometric angles
+  const sx = (x - z) * Math.cos(Math.PI / 6) * scale + ox;
+  const sy = (x + z) * Math.sin(Math.PI / 6) * scale - y * scale + oy;
+  return { sx, sy };
+}
+
+// ─── 3D SCATTER CANVAS ───────────────────────────────────────────────────────
+
+function Scatter3D({ pts, isDark, highlight, eigenvectors, showAxes, showMean }) {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth || 360;
+    const h = canvas.clientHeight || 280;
+    if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+      canvas.width = w * dpr; canvas.height = h * dpr;
+    }
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+
+    const ox = w * 0.5, oy = h * 0.52;
+
+    // Determine scale from data range
+    const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y), zs = pts.map((p) => p.z);
+    const maxRange = Math.max(
+      Math.max(...xs) - Math.min(...xs),
+      Math.max(...ys) - Math.min(...ys),
+      Math.max(...zs) - Math.min(...zs),
+      1
+    );
+    const scale = (Math.min(w, h) * 0.36) / maxRange;
+
+    // Subtle grid lines for reference
+    const gridColor = isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)";
+    ctx.strokeStyle = gridColor; ctx.lineWidth = 0.5;
+    for (let g = -3; g <= 3; g++) {
+      const { sx: sx1, sy: sy1 } = iso(g, 0, -3, scale, ox, oy);
+      const { sx: sx2, sy: sy2 } = iso(g, 0,  3, scale, ox, oy);
+      ctx.beginPath(); ctx.moveTo(sx1, sy1); ctx.lineTo(sx2, sy2); ctx.stroke();
+      const { sx: sx3, sy: sy3 } = iso(-3, 0, g, scale, ox, oy);
+      const { sx: sx4, sy: sy4 } = iso( 3, 0, g, scale, ox, oy);
+      ctx.beginPath(); ctx.moveTo(sx3, sy3); ctx.lineTo(sx4, sy4); ctx.stroke();
+    }
+
+    // Axis arrows
+    const axisLen = 2.5;
+    const drawAxis = (dx, dy, dz, color, label) => {
+      const { sx: x1, sy: y1 } = iso(0, 0, 0, scale, ox, oy);
+      const { sx: x2, sy: y2 } = iso(dx * axisLen, dy * axisLen, dz * axisLen, scale, ox, oy);
+      ctx.strokeStyle = color; ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = color; ctx.font = "10px system-ui"; ctx.textAlign = "center";
+      ctx.fillText(label, x2, y2 - 6);
+    };
+    const axisAlpha = isDark ? "0.35" : "0.3";
+    drawAxis(1, 0, 0, `rgba(200,80,80,${axisAlpha})`,  "x");
+    drawAxis(0, 1, 0, `rgba(80,180,80,${axisAlpha})`,  "y");
+    drawAxis(0, 0, 1, `rgba(80,80,200,${axisAlpha})`,  "z");
+
+    // Draw mean cross if requested
+    if (showMean) {
+      const mx = mean(pts.map((p) => p.x));
+      const my = mean(pts.map((p) => p.y));
+      const mz = mean(pts.map((p) => p.z));
+      const { sx, sy } = iso(mx, my, mz, scale, ox, oy);
+      ctx.strokeStyle = RED; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(sx - 8, sy); ctx.lineTo(sx + 8, sy); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(sx, sy - 8); ctx.lineTo(sx, sy + 8); ctx.stroke();
+      ctx.fillStyle = RED; ctx.font = "bold 10px system-ui"; ctx.textAlign = "left";
+      ctx.fillText("mean", sx + 6, sy - 4);
+    }
+
+    // Eigenvector arrows
+    if (showAxes && eigenvectors) {
+      const mx = mean(pts.map((p) => p.x));
+      const my = mean(pts.map((p) => p.y));
+      const mz = mean(pts.map((p) => p.z));
+      const colors = [GOLD, BLUE, TEAL];
+      const labels = ["PC1", "PC2", "PC3"];
+      eigenvectors.forEach(([vx, vy, vz], i) => {
+        const evLen = 2.2;
+        const { sx: ex1, sy: ey1 } = iso(mx - vx * evLen, my - vy * evLen, mz - vz * evLen, scale, ox, oy);
+        const { sx: ex2, sy: ey2 } = iso(mx + vx * evLen, my + vy * evLen, mz + vz * evLen, scale, ox, oy);
+        ctx.strokeStyle = colors[i]; ctx.lineWidth = i === 0 ? 2.5 : 1.8;
+        ctx.beginPath(); ctx.moveTo(ex1, ey1); ctx.lineTo(ex2, ey2); ctx.stroke();
+        // arrowhead
+        const dx = ex2 - ex1, dy = ey2 - ey1;
+        const l = Math.sqrt(dx * dx + dy * dy); if (l < 1) return;
+        const ux = dx / l, uy = dy / l, hl = 8;
+        ctx.fillStyle = colors[i];
+        ctx.beginPath();
+        ctx.moveTo(ex2, ey2);
+        ctx.lineTo(ex2 - hl * ux + hl * 0.4 * uy, ey2 - hl * uy - hl * 0.4 * ux);
+        ctx.lineTo(ex2 - hl * ux - hl * 0.4 * uy, ey2 - hl * uy + hl * 0.4 * ux);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = colors[i]; ctx.font = "500 11px system-ui"; ctx.textAlign = "left";
+        ctx.fillText(labels[i], ex2 + 4, ey2 + 4);
+      });
+    }
+
+    // Data points — sort by depth for painter's algorithm
+    const sorted = pts
+      .map((p) => ({ ...p, depth: p.x - p.z }))
+      .sort((a, b) => a.depth - b.depth);
+
+    sorted.forEach((p) => {
+      const { sx, sy } = iso(p.x, p.y, p.z, scale, ox, oy);
+      const alpha = highlight ? 0.25 : 0.65;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(195,29,29,${alpha})`;
+      ctx.fill();
+    });
+
+    // Highlighted points
+    if (highlight && highlight.length > 0) {
+      highlight.forEach((p) => {
+        const { sx, sy } = iso(p.x, p.y, p.z, scale, ox, oy);
+        ctx.beginPath(); ctx.arc(sx, sy, 4, 0, Math.PI * 2);
+        ctx.fillStyle = RED; ctx.fill();
+      });
+    }
+  });
+
+  return <canvas ref={ref} style={{ display: "block", width: "100%", height: "100%" }} />;
+}
+
+// ─── 2D SCATTER CANVAS (projection result) ────────────────────────────────────
+
+function Scatter2D({ projPts, isDark, eigenvalues }) {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth || 320;
+    const h = canvas.clientHeight || 280;
+    if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+      canvas.width = w * dpr; canvas.height = h * dpr;
+    }
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+
+    const pad = 40, cx = w / 2, cy = h / 2;
+    const vals1 = projPts.map((p) => p.pc1);
+    const vals2 = projPts.map((p) => p.pc2);
+    const maxR = Math.max(
+      Math.max(...vals1.map(Math.abs)),
+      Math.max(...vals2.map(Math.abs)),
+      1
+    ) * 1.15;
+
+    const toSx = (v) => cx + (v / maxR) * (w / 2 - pad);
+    const toSy = (v) => cy - (v / maxR) * (h / 2 - pad);
+
+    // Grid
+    ctx.strokeStyle = isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.05)";
+    ctx.lineWidth = 0.5;
+    for (let g = -2; g <= 2; g++) {
+      ctx.beginPath(); ctx.moveTo(toSx(g * maxR / 3), pad); ctx.lineTo(toSx(g * maxR / 3), h - pad); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(pad, toSy(g * maxR / 3)); ctx.lineTo(w - pad, toSy(g * maxR / 3)); ctx.stroke();
+    }
+    // Axes
+    ctx.strokeStyle = GOLD; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(pad, cy); ctx.lineTo(w - pad, cy); ctx.stroke();
+    ctx.fillStyle = GOLD; ctx.font = "500 11px system-ui"; ctx.textAlign = "left";
+    ctx.fillText("PC1", w - pad + 4, cy + 4);
+
+    ctx.strokeStyle = BLUE; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(cx, pad); ctx.lineTo(cx, h - pad); ctx.stroke();
+    ctx.fillStyle = BLUE;
+    ctx.fillText("PC2", cx + 4, pad);
+
+    // Points
+    projPts.forEach(({ pc1, pc2 }) => {
+      ctx.beginPath(); ctx.arc(toSx(pc1), toSy(pc2), 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(195,29,29,0.6)"; ctx.fill();
+    });
+  });
+
+  return <canvas ref={ref} style={{ display: "block", width: "100%", height: "100%" }} />;
+}
+
+// ─── MATRIX DISPLAY ──────────────────────────────────────────────────────────
+
+function MatrixDisplay({ rows, label, color = "var(--text-primary)", size = 13 }) {
+  return (
+    <div style={{ display: "inline-flex", alignItems: "center", gap: 8, fontFamily: "monospace" }}>
+      {label && <span style={{ fontSize: size, color: "var(--text-muted)", marginRight: 4 }}>{label} =</span>}
+      <span style={{ fontSize: size + 4, color: "var(--text-muted)", lineHeight: 1 }}>[</span>
+      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        {rows.map((row, i) => (
+          <div key={i} style={{ display: "flex", gap: 12 }}>
+            {row.map((v, j) => (
+              <span key={j} style={{ fontSize: size, color, minWidth: 52, textAlign: "right", fontWeight: 500 }}>
+                {typeof v === "number" ? v.toFixed(3) : v}
+              </span>
+            ))}
+          </div>
+        ))}
+      </div>
+      <span style={{ fontSize: size + 4, color: "var(--text-muted)", lineHeight: 1 }}>]</span>
+    </div>
+  );
+}
+
+// ─── STEP INDICATOR ──────────────────────────────────────────────────────────
+
+function StepBar({ current, total }) {
+  return (
+    <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: "1.5rem" }}>
+      {Array.from({ length: total }).map((_, i) => (
+        <div key={i} style={{
+          height: 4, flex: 1, borderRadius: 2,
+          background: i < current ? "var(--text-primary)" : i === current ? GOLD : "var(--border)",
+          transition: "background 0.3s",
+        }} />
+      ))}
+      <span style={{ fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap", marginLeft: 4 }}>
+        Step {current + 1} / {total}
+      </span>
+    </div>
+  );
+}
+
+// ─── MAIN STAGE 2 COMPONENT ──────────────────────────────────────────────────
+
+const STEP_LABELS = [
+  "Compute the mean",
+  "Covariance matrix",
+  "Eigendecomposition",
+  "Dimension reduction",
+];
+
+export default function Stage2StepByStep({ isDark, goToStage1 }) {
+  const [shapeKey, setShapeKey] = useState(null);   // null = shape picker screen
+  const [step, setStep]         = useState(0);
+  const [centered, setCentered] = useState(false);  // for step 1 toggle
+
+  const pts = useMemo(
+    () => (shapeKey ? SHAPES[shapeKey].generate() : []),
+    [shapeKey]
+  );
+
+  const pca = useMemo(
+    () => (pts.length ? computePCA3D(pts) : null),
+    [pts]
+  );
+
+  const centeredPts  = pca?.centeredPts ?? [];
+  const displayPts   = centered ? centeredPts : pts;
+  const projPts      = pca ? projectPoints3D(centeredPts, pca.eigenvectors, 2) : [];
+
+  if (!shapeKey) {
+    return <ShapePicker isDark={isDark} goToStage1={goToStage1} onSelect={(k) => { setShapeKey(k); setStep(0); setCentered(false); }} />;
+  }
+
+  return (
+    <div style={{ maxWidth: 860, margin: "0 auto", padding: "2rem 1.5rem 5rem" }}>
+
+      {/* ── Header ── */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: "0.5rem" }}>
+        <button onClick={() => setShapeKey(null)} style={{ padding: "4px 10px", fontSize: 12 }}>
+          ← Back
+        </button>
+        <span style={{
+          fontSize: 10.5, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase",
+          color: "var(--text-muted)", background: "var(--surface)",
+          border: "0.5px solid var(--border)", borderRadius: 20, padding: "3px 10px",
+        }}>
+          Stage 2 — Step-by-step PCA
+        </span>
+      </div>
+      <h1 style={{ marginBottom: "0.4rem" }}>3D → 2D with {SHAPES[shapeKey].label}</h1>
+      <p style={{ marginBottom: "1.5rem", maxWidth: 560 }}>{SHAPES[shapeKey].description}</p>
+
+      {/* Step navigation */}
+      <StepBar current={step} total={4} />
+
+      <div style={{ display: "flex", gap: 6, marginBottom: "2rem", flexWrap: "wrap" }}>
+        {STEP_LABELS.map((label, i) => (
+          <button
+            key={i}
+            onClick={() => setStep(i)}
+            style={{
+              fontSize: 12, padding: "5px 12px", borderRadius: 20,
+              background: step === i ? "var(--text-primary)" : "transparent",
+              color: step === i ? "var(--bg)" : "var(--text-muted)",
+              border: `0.5px solid ${step === i ? "transparent" : "var(--border)"}`,
+            }}
+          >
+            {i + 1}. {label}
+          </button>
+        ))}
+      </div>
+
+      {step === 0 && <StepMean pts={pts} pca={pca} centered={centered} setCentered={setCentered} centeredPts={centeredPts} isDark={isDark} />}
+      {step === 1 && <StepCovariance pca={pca} centeredPts={centeredPts} isDark={isDark} />}
+      {step === 2 && <StepEigen pca={pca} centeredPts={centeredPts} isDark={isDark} />}
+      {step === 3 && <StepReduction pca={pca} centeredPts={centeredPts} projPts={projPts} isDark={isDark} />}
+
+      {/* Prev / Next */}
+      <div style={{ display: "flex", justifyContent: "space-between", marginTop: "2rem" }}>
+        <button onClick={() => {
+          if (step === 0) {
+            setShapeKey(null);   // go back to shape picker
+          } else {
+            setStep((s) => s - 1);
+          }
+        }}>
+          {step === 0 ? "← Back to shapes" : "← Previous"}
+        </button>
+        <button onClick={() => {
+          if (step === 3) {
+            setShapeKey(null);   // go back to shape picker
+          } else {
+            setStep((s) => s + 1);
+          }
+        }} className="btn-primary">
+          {step === 3 ? "Choose another shape →" : "Next →"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── SHAPE PICKER ─────────────────────────────────────────────────────────────
+
+function ShapePicker({ isDark, onSelect, goToStage1 }) {
+  return (
+    <div style={{ maxWidth: 820, margin: "0 auto", padding: "2rem 1.5rem 5rem" }}>
+      <div style={{
+        fontSize: 10.5, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase",
+        color: "var(--text-muted)", background: "var(--surface)",
+        border: "0.5px solid var(--border)", borderRadius: 20,
+        padding: "3px 10px", display: "inline-block", marginBottom: "0.75rem",
+      }}>
+        Stage 2 — Step-by-step PCA
+      </div>
+      <h1 style={{ marginBottom: "0.75rem" }}>3D → 2D: PCA step by step</h1>
+      <p style={{ marginBottom: "0.75rem", maxWidth: 580 }}>
+        Choose a 3D shape to work with. Each shape has a different variance structure —
+        you'll see how PCA finds the directions that matter for each one.
+      </p>
+      <p style={{ marginBottom: "2rem", maxWidth: 580 }}>
+        All shapes are <strong>intentionally not centered at the origin</strong> so you can
+        see exactly why mean-centering is the critical first step.
+      </p>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "1rem" }}>
+        {Object.entries(SHAPES).map(([key, { label, description }]) => (
+          <button
+            key={key}
+            onClick={() => onSelect(key)}
+            style={{
+              background: "var(--surface)", border: "0.5px solid var(--border)",
+              borderRadius: 14, padding: "1.5rem 1.25rem", textAlign: "left",
+              cursor: "pointer", transition: "border-color 0.15s, box-shadow 0.15s",
+              display: "block",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--border-strong)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; }}
+          >
+            <div style={{ fontSize: 28, marginBottom: 10 }}>
+              {key === "helix" ? "🌀" : key === "disc" ? "🥏" : "🔵"}
+            </div>
+            <div style={{ fontSize: 15, fontWeight: 500, color: "var(--text-primary)", marginBottom: 6 }}>
+              {label}
+            </div>
+            <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.6 }}>
+              {description}
+            </div>
+          </button>
+        ))}
+      </div>
+      <br /><br />
+      <button onClick={goToStage1}> ← Back to Intuition </button>
+    </div>
+  );
+}
+
+// ─── STEP 1: COMPUTE THE MEAN ─────────────────────────────────────────────────
+
+function StepMean({ pts, pca, centered, setCentered, centeredPts, isDark }) {
+  if (!pca) return null;
+  const [mx, my, mz] = pca.mean3;
+
+  return (
+    <div>
+      <h2>Step 1: Compute the mean — and center the data</h2>
+      <br />
+      <p style={{ marginBottom: "1rem" }}>
+        The first step of PCA is to <strong>subtract the mean</strong> from every point,
+        shifting the entire dataset so that its centroid sits at the origin (0, 0, 0).
+        This is called <strong>mean centering</strong>.
+      </p>
+
+      <Callout borderColor={RED} bg={isDark ? "rgba(232,93,36,0.08)" : "rgba(232,93,36,0.06)"}>
+        <strong>Why does it matter?</strong> PCA computes directions through the <em>origin</em>.
+        If the data is not centered, the first "principal component" will point toward the
+        mean of the data rather than the direction of maximum variance — giving completely
+        wrong results. Mean centering ensures PCA captures <em>spread</em>, not <em>location</em>.
+      </Callout>
+
+      <br />
+
+      {/* Mean values */}
+      <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "1rem 1.25rem", marginBottom: "1rem" }}>
+        <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10 }}>Computed mean of the dataset:</div>
+        <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+          {[["x̄", mx], ["ȳ", my], ["z̄", mz]].map(([label, val]) => (
+            <div key={label} style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{label}</div>
+              <div style={{ fontSize: 20, fontWeight: 500, color: RED }}>{val.toFixed(3)}</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 10 }}>
+          New point xᵢ′ = xᵢ − x̄ &nbsp;&nbsp; yᵢ′ = yᵢ − ȳ &nbsp;&nbsp; zᵢ′ = zᵢ − z̄
+        </div>
+      </div>
+
+      {/* Toggle + 3D view */}
+      <div style={{ display: "flex", gap: 8, marginBottom: "1rem" }}>
+        <button
+          className={!centered ? "btn-primary": ""}
+          onClick={() => setCentered(false)}
+        >
+          Before centering
+        </button>
+        <button
+          className={centered ? "btn-primary" : ""}
+          onClick={() => setCentered(true)}
+        >
+          After centering ✓
+        </button>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "1rem" }}>
+        <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "10px 12px" }}>
+          <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 6 }}>
+            {centered ? "After centering — centroid at (0,0,0)" : "Raw data — centroid is far from origin"}
+          </div>
+          <div style={{ height: 260 }}>
+            <Scatter3D
+              pts={centered ? centeredPts : pts}
+              isDark={isDark}
+              showMean={!centered}
+            />
+          </div>
+        </div>
+        <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "1rem 1.25rem" }}>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10 }}>What changes:</div>
+          {centered ? (
+            <>
+              <Callout borderColor={GREEN} bg={isDark ? "rgba(29,158,117,0.08)" : "rgba(29,158,117,0.06)"}>
+                The centroid (red cross) is now at (0, 0, 0). All three mean values are ≈ 0.
+                PCA can now correctly identify directions of spread.
+              </Callout>
+              <br />
+              <div style={{ display: "flex", gap: 12 }}>
+                {[["x̄′", mean(centeredPts.map(p=>p.x))], ["ȳ′", mean(centeredPts.map(p=>p.y))], ["z̄′", mean(centeredPts.map(p=>p.z))]].map(([l,v]) => (
+                  <div key={l} style={{ textAlign: "center" }}>
+                    <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{l}</div>
+                    <div style={{ fontSize: 18, fontWeight: 500, color: GREEN }}>{Math.abs(v) < 1e-10 ? "0.000" : v.toFixed(3)}</div>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <Callout borderColor={RED} bg={isDark ? "rgba(232,93,36,0.08)" : "rgba(232,93,36,0.06)"}>
+                The red cross marks the mean. It is far from (0,0,0).
+                If PCA runs now, the first component will point toward this offset
+                rather than toward the direction of maximum spread.
+              </Callout>
+              <br />
+              <p>Toggle to "After centering" to see the data shift.</p>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── STEP 2: COVARIANCE MATRIX ────────────────────────────────────────────────
+
+function StepCovariance({ pca, centeredPts, isDark }) {
+  if (!pca) return null;
+  const C = pca.covMatrix;
+  const n = centeredPts.length;
+
+  return (
+    <div>
+      <h2>Step 2: Compute the covariance matrix</h2>
+      <br />
+      <p style={{ marginBottom: "1rem" }}>
+        The <strong>covariance matrix</strong> Σ captures how each pair of dimensions varies
+        together. For 3D data it is a 3×3 symmetric matrix:
+      </p>
+
+      {/* Formula */}
+      <div style={{
+        background: "var(--surface)", border: "0.5px solid var(--border)",
+        borderRadius: 12, padding: "1rem 1.5rem", marginBottom: "1rem",
+        overflowX: "auto",
+      }}>
+        <div style={{ fontSize: 13, color: "var(--text-muted)", marginBottom: 8 }}>General formula:</div>
+        <div style={{ fontSize: 14, fontFamily: "monospace", color: "var(--text-primary)", lineHeight: 2 }}>
+          Σ = (1/n) · Xᵀ · X
+        </div>
+        <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4 }}>
+          where X is the (n × 3) matrix of <em>centered</em> data points.
+          Each entry Σᵢⱼ = (1/n) Σₖ xᵢₖ · xⱼₖ
+        </div>
+      </div>
+
+      {/* What each entry means */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: "1rem" }}>
+        {[
+          { label: "Diagonal entries", desc: "Var(xᵢ) — variance of each dimension individually.", color: GOLD },
+          { label: "Off-diagonal entries", desc: "Cov(xᵢ, xⱼ) — how much two dimensions change together. Positive = same direction, negative = opposite.", color: BLUE },
+          { label: "Symmetry", desc: "Σᵢⱼ = Σⱼᵢ always. The matrix is always symmetric around the diagonal.", color: GREEN },
+        ].map(({ label, desc, color }) => (
+          <div key={label} style={{
+            background: "var(--surface)", border: `0.5px solid ${color}30`,
+            borderLeft: `3px solid ${color}`, borderRadius: "0 8px 8px 0",
+            padding: "10px 12px",
+          }}>
+            <div style={{ fontSize: 12, fontWeight: 500, marginBottom: 4 }}>{label}</div>
+            <div style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.5 }}>{desc}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Computed matrix */}
+      <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "1rem 1.5rem", marginBottom: "1rem" }}>
+        <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 12 }}>
+          Computed covariance matrix (n = {n} centered points):
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "1rem", alignItems: "start", flexWrap: "wrap" }}>
+          <div style={{ overflowX: "auto" }}>
+            <MatrixDisplay
+              rows={C.map((row) => row)}
+              label="Σ"
+              color="var(--text-primary)"
+            />
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 6 }}>Diagonal (variances):</div>
+            {["Var(x)", "Var(y)", "Var(z)"].map((l, i) => (
+              <div key={i} style={{ fontSize: 13, marginBottom: 3 }}>
+                <span style={{ color: "var(--text-muted)" }}>{l} = </span>
+                <strong style={{ color: GOLD }}>{C[i][i].toFixed(4)}</strong>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <Callout borderColor={BLUE} bg={isDark ? "rgba(79,140,255,0.08)" : "rgba(79,140,255,0.06)"}>
+        <strong>Key insight:</strong> Large diagonal values mean that dimension has high spread.
+        Large off-diagonal values mean two dimensions are correlated — they carry redundant information.
+        PCA uses this matrix to find directions that <em>decorrelate</em> the data.
+      </Callout>
+    </div>
+  );
+}
+
+// ─── STEP 3: EIGENDECOMPOSITION ───────────────────────────────────────────────
+
+function StepEigen({ pca, centeredPts, isDark }) {
+  if (!pca) return null;
+  const { eigenvectors, eigenvalues, totalVar } = pca;
+
+  return (
+    <div>
+      <h2>Step 3: Eigendecomposition</h2>
+      <br />
+      <p style={{ marginBottom: "1rem" }}>
+        We now factorise the covariance matrix Σ into its <strong>eigenvalues</strong> and{" "}
+        <strong>eigenvectors</strong>:
+      </p>
+
+      {/* Formula */}
+      <div style={{
+        background: "var(--surface)", border: "0.5px solid var(--border)",
+        borderRadius: 12, padding: "1rem 1.5rem", marginBottom: "1rem",
+        fontFamily: "monospace", fontSize: 14, lineHeight: 2,
+      }}>
+        <div style={{ color: "var(--text-muted)", fontSize: 12, marginBottom: 4 }}>Eigenvalue equation:</div>
+        <div>Σ · <span style={{ color: GOLD }}>v</span> = <span style={{ color: BLUE }}>λ</span> · <span style={{ color: GOLD }}>v</span></div>
+        <div style={{ fontSize: 12, color: "var(--text-muted)", marginTop: 4, fontFamily: "system-ui" }}>
+          <span style={{ color: GOLD }}>v</span> = eigenvector (direction) &nbsp;·&nbsp;
+          <span style={{ color: BLUE }}>λ</span> = eigenvalue (variance along that direction)
+        </div>
+      </div>
+
+      {/* Eigenvectors table */}
+      <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "1rem 1.5rem", marginBottom: "1rem" }}>
+        <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10 }}>
+          Computed eigenvectors (sorted by eigenvalue, descending):
+        </div>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr>
+                {["Component", "Eigenvector (direction)", "Eigenvalue λ", "Variance explained", "Cumulative"].map((h) => (
+                  <th key={h} style={{ textAlign: "left", padding: "6px 10px", borderBottom: "0.5px solid var(--border)", color: "var(--text-muted)", fontWeight: 500, fontSize: 11 }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {eigenvectors.map((v, i) => {
+                const cum = eigenvalues.slice(0, i + 1).reduce((s, x) => s + x, 0);
+                const colors = [GOLD, BLUE, TEAL];
+                return (
+                  <tr key={i} style={{ borderBottom: "0.5px solid var(--border)" }}>
+                    <td style={{ padding: "8px 10px" }}>
+                      <span style={{ color: colors[i], fontWeight: 500 }}>PC{i + 1}</span>
+                    </td>
+                    <td style={{ padding: "8px 10px", fontFamily: "monospace", fontSize: 12 }}>
+                      [{v.map((x) => x.toFixed(3)).join(", ")}]
+                    </td>
+                    <td style={{ padding: "8px 10px", color: colors[i], fontWeight: 500 }}>
+                      {eigenvalues[i].toFixed(4)}
+                    </td>
+                    <td style={{ padding: "8px 10px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <div style={{ flex: 1, height: 5, background: "var(--border)", borderRadius: 3, minWidth: 60 }}>
+                          <div style={{ height: "100%", background: colors[i], borderRadius: 3, width: `${(eigenvalues[i] / totalVar * 100).toFixed(1)}%` }} />
+                        </div>
+                        <span>{(eigenvalues[i] / totalVar * 100).toFixed(1)}%</span>
+                      </div>
+                    </td>
+                    <td style={{ padding: "8px 10px", color: "var(--text-muted)" }}>
+                      {(cum / totalVar * 100).toFixed(1)}%
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 3D visualisation with eigenvectors */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "1rem" }}>
+        <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "10px 12px" }}>
+          <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 6 }}>Centered data with principal axes</div>
+          <div style={{ height: 260 }}>
+            <Scatter3D pts={centeredPts} isDark={isDark} eigenvectors={eigenvectors} showAxes={true} />
+          </div>
+        </div>
+        <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "1rem 1.25rem" }}>
+          <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 10 }}>Reading the diagram:</div>
+          {[
+            { color: GOLD,  label: "PC1", desc: `Longest axis — ${(eigenvalues[0]/totalVar*100).toFixed(1)}% of variance. This is the direction the data "stretches" most.` },
+            { color: BLUE,  label: "PC2", desc: `Second axis — ${(eigenvalues[1]/totalVar*100).toFixed(1)}% of variance. Orthogonal to PC1.` },
+            { color: TEAL,  label: "PC3", desc: `Shortest axis — ${(eigenvalues[2]/totalVar*100).toFixed(1)}% of variance. This is what we discard when reducing to 2D.` },
+          ].map(({ color, label, desc }) => (
+            <div key={label} style={{ display: "flex", gap: 10, marginBottom: 10 }}>
+              <div style={{ width: 4, borderRadius: 2, background: color, flexShrink: 0 }} />
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 500, color }}>{label}</div>
+                <div style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.5 }}>{desc}</div>
+              </div>
+            </div>
+          ))}
+          <Callout borderColor={GREEN} bg={isDark ? "rgba(29,158,117,0.08)" : "rgba(29,158,117,0.06)"}>
+            Eigenvectors are always <strong>orthogonal</strong> (perpendicular) to each other.
+            They form a new coordinate system aligned with the data's natural axes.
+          </Callout>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── STEP 4: DIMENSION REDUCTION ──────────────────────────────────────────────
+
+function StepReduction({ pca, centeredPts, projPts, isDark }) {
+  if (!pca) return null;
+  const { eigenvalues, totalVar } = pca;
+  const kept    = eigenvalues[0] + eigenvalues[1];
+  const keptPct = (kept / totalVar * 100).toFixed(1);
+  const lostPct = (eigenvalues[2] / totalVar * 100).toFixed(1);
+
+  return (
+    <div>
+      <h2>Step 4: Dimension reduction — 3D → 2D</h2>
+      <br />
+      <p style={{ marginBottom: "1rem" }}>
+        We keep only the top 2 eigenvectors (PC1 and PC2) and project every point onto them.
+        Each 3D point (x, y, z) becomes a 2D point (pc1, pc2) by taking the dot product with each eigenvector:
+      </p>
+
+      {/* Formula */}
+      <div style={{
+        background: "var(--surface)", border: "0.5px solid var(--border)",
+        borderRadius: 12, padding: "1rem 1.5rem", marginBottom: "1rem",
+        fontFamily: "monospace", fontSize: 13,
+      }}>
+        <div style={{ color: "var(--text-muted)", fontSize: 11, marginBottom: 6 }}>Projection formula:</div>
+        <div style={{ lineHeight: 2 }}>
+          <div>pc1 = <span style={{ color: GOLD }}>v₁</span> · x′ = v₁ₓ·x′ + v₁ᵧ·y′ + v₁_z·z′</div>
+          <div>pc2 = <span style={{ color: BLUE }}>v₂</span> · x′ = v₂ₓ·x′ + v₂ᵧ·y′ + v₂_z·z′</div>
+        </div>
+        <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 4, fontFamily: "system-ui" }}>
+          x′ = centered point &nbsp;·&nbsp; v₁, v₂ = first two eigenvectors
+        </div>
+      </div>
+
+      {/* Before / After */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: "0.75rem", alignItems: "center", marginBottom: "1rem" }}>
+        <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "10px 12px" }}>
+          <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 6 }}>3D centered data</div>
+          <div style={{ height: 240 }}>
+            <Scatter3D pts={centeredPts} isDark={isDark} eigenvectors={pca.eigenvectors} showAxes={true} />
+          </div>
+        </div>
+        <div style={{ textAlign: "center", color: "var(--text-muted)", fontSize: 22 }}>→</div>
+        <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "10px 12px" }}>
+          <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 6 }}>2D projection (PC1 × PC2)</div>
+          <div style={{ height: 240 }}>
+            <Scatter2D projPts={projPts} isDark={isDark} eigenvalues={eigenvalues} />
+          </div>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: "1rem" }}>
+        <MetricCard label="Dimensions before" value="3" sub="x, y, z" />
+        <MetricCard label="Dimensions after" value="2" sub="PC1, PC2" accent={GREEN} />
+        <MetricCard label="Variance retained" value={`${keptPct}%`} sub={`Lost only ${lostPct}% (PC3)`} accent={GOLD} />
+      </div>
+
+      <Callout borderColor={GREEN} bg={isDark ? "rgba(29,158,117,0.08)" : "rgba(29,158,117,0.06)"}>
+        <strong>We went from 3D to 2D retaining {keptPct}% of the variance.</strong>{" "}
+        The discarded dimension (PC3) carried only {lostPct}% of the information —
+        a small price to pay for halving the number of features. In real datasets with
+        hundreds of dimensions, PCA can often retain 95%+ of variance in just 10–20 components.
+      </Callout>
+
+      <br />
+
+      <Callout borderColor={BLUE} bg={isDark ? "rgba(79,140,255,0.08)" : "rgba(79,140,255,0.06)"}>
+        <strong>What we did, step by step:</strong><br />
+        1. Subtracted the mean → data centered at origin<br />
+        2. Computed covariance matrix → captured how dimensions co-vary<br />
+        3. Eigendecomposition → found directions of maximum variance<br />
+        4. Projected onto top-2 eigenvectors → dropped the least informative dimension
+      </Callout>
+    </div>
+  );
+}

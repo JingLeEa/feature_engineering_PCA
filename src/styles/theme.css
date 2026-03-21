@@ -1,0 +1,25 @@
+/* ── LIGHT THEME (default) ── */
+:root {
+  --bg:             #fafaf8;
+  --surface:        #ffffff;
+  --metric-bg:      #f4f4f2;
+  --border:         rgba(0, 0, 0, 0.08);
+  --border-strong:  rgba(0, 0, 0, 0.22);
+  --text-primary:   #1a1a17;
+  --text-secondary: #52524e;
+  --text-muted:     #9a9890;
+  --text-highlighted: #c0392b;
+}
+
+/* ── DARK THEME ── */
+:root[data-theme="dark"] {
+  --bg:             #111110;
+  --surface:        #1a1a18;
+  --metric-bg:      #161614;
+  --border:         rgba(255, 255, 255, 0.09);
+  --border-strong:  rgba(255, 255, 255, 0.28);
+  --text-primary:   #edece8;
+  --text-secondary: #9a9890;
+  --text-muted:     #5c5b56;
+  --text-highlighted: #e74c3c;
+}

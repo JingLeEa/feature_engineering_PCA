@@ -8,8 +8,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "ml-matrix": "^6.12.1",
-    "ml-pca": "^4.1.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

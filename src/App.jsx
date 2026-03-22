@@ -31,7 +31,7 @@ export default function App() {
         {/* Logo / Title */}
         <div style={{
           fontWeight: 600,
-          fontSize: 15,
+          fontSize: 16,
           color: "var(--text-primary)",
           marginRight: "0.5rem",
           whiteSpace: "nowrap",
@@ -47,7 +47,7 @@ export default function App() {
             onClick={() => setPage(id)}
             style={{
               padding: "14px",
-              fontSize: 13,
+              fontSize: 15,
               background: "transparent",
               border: "none",
               borderBottom:

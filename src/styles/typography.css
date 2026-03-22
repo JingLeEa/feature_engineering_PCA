@@ -14,7 +14,7 @@ h2 {
 }
 
 h3 {
-  font-size: 16px;
+  font-size: 16x;
   font-weight: 500;
   line-height: 1.4;
   color: var(--text-primary);
@@ -22,7 +22,7 @@ h3 {
 }
 
 p {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text-secondary);
   line-height: 1.75;
 }
@@ -30,7 +30,7 @@ p {
 ul {
   padding-left: 1.5rem;
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.75;
 }
 

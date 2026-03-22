@@ -8,6 +8,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "katex": "^0.16.40",
+    "ml-matrix": "^6.12.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },

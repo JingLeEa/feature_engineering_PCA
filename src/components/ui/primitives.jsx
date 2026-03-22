@@ -9,9 +9,9 @@ export function MetricCard({ label, value, sub, accent }) {
       padding: "10px 14px",
       borderLeft: accent ? `3px solid ${accent}` : undefined,
     }}>
-      <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 20, fontWeight: 500 }}>{value}</div>
-      {sub && <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 2 }}>{sub}</div>}
+      {sub && <div style={{ fontSize: 14, color: "var(--text-muted)", marginTop: 2 }}>{sub}</div>}
     </div>
   );
 }
@@ -25,7 +25,7 @@ export function Callout({ children, borderColor, bg }) {
       background: bg,
       borderRadius: "0 8px 8px 0",
       padding: "10px 14px",
-      fontSize: 13.5,
+      fontSize: 15,
       lineHeight: 1.65,
       color: "var(--text-secondary)",
     }}>

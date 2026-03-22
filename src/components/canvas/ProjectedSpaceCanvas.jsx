@@ -34,7 +34,7 @@ export default function ProjectedSpaceCanvas({ pts, angleDeg, isDark }) {
     // Fixed axes
     ctx.strokeStyle = GOLD; ctx.lineWidth = 2.5;
     ctx.beginPath(); ctx.moveTo(pad, cy); ctx.lineTo(w - pad, cy); ctx.stroke();
-    ctx.fillStyle = GOLD; ctx.font = "500 11px system-ui"; ctx.textAlign = "left";
+    ctx.fillStyle = GOLD; ctx.font = "500 13px system-ui"; ctx.textAlign = "left";
     ctx.fillText("PC1", w - pad + 5, cy + 4);
 
     ctx.strokeStyle = BLUE; ctx.lineWidth = 2;

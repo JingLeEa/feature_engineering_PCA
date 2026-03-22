@@ -37,7 +37,7 @@ export default function Stage1Intuition({ isDark, goToStage2 }) {
 
       {/* ── HERO ── */}
       <div style={{
-        display: "inline-block", fontSize: 10.5, fontWeight: 600,
+        display: "inline-block", fontSize: 12, fontWeight: 600,
         letterSpacing: "0.1em", textTransform: "uppercase",
         color: "var(--text-muted)", background: "var(--surface)",
         border: "0.5px solid var(--border)", borderRadius: 20,
@@ -46,9 +46,8 @@ export default function Stage1Intuition({ isDark, goToStage2 }) {
         Stage 1 — Intuition
       </div>
       <h1>Principal Component Analysis</h1>
-      <p style={{ marginTop: "0.75rem", marginBottom: "2rem", maxWidth: 580 }}>
-        A technique for reducing the number of dimensions in a dataset while keeping
-        as much of the meaningful variation as possible.
+      <p style={{ marginTop: "0.75rem", marginBottom: "2rem" }}>
+        <strong>A technique for reducing the number of dimensions in a dataset while keeping as much of the meaningful variation as possible.</strong>
       </p>
 
       {/* ── WHAT IS PCA ── */}
@@ -60,7 +59,7 @@ export default function Stage1Intuition({ isDark, goToStage2 }) {
       }}>
         <p style={{ margin: 0 }}>
           Real-world datasets often have dozens or hundreds of features. Many of these features
-          are <em>correlated</em> — they carry overlapping information. PCA finds a{" "}
+          are <em>correlated</em> - they carry overlapping information. PCA finds a{" "}
           <strong style={{ color: "var(--text-highlighted)" }}>new set of axes</strong>{" "}
           that point in the directions of{" "}
           <strong style={{ color: "var(--text-highlighted)" }}>maximum variation</strong>, letting
@@ -99,9 +98,9 @@ export default function Stage1Intuition({ isDark, goToStage2 }) {
             background: "var(--surface)", border: "0.5px solid var(--border)",
             borderRadius: 12, padding: "1rem 1.25rem",
           }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text-muted)", marginBottom: 6 }}>{n}</div>
-            <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 6 }}>{title}</div>
-            <div style={{ fontSize: 13.5, color: "var(--text-secondary)", lineHeight: 1.65 }}>{body}</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text-muted)", marginBottom: 6 }}>{n}</div>
+            <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 6 }}>{title}</div>
+            <div style={{ fontSize: 15, color: "var(--text-secondary)", lineHeight: 1.65 }}>{body}</div>
           </div>
         ))}
       </div>
@@ -128,7 +127,7 @@ export default function Stage1Intuition({ isDark, goToStage2 }) {
       {/* Dual scatter plots */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "0.75rem" }}>
         <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "10px 12px" }}>
-          <div style={{ fontSize: 11, color: "var(--text-muted)", textAlign: "center", marginBottom: 6 }}>
+          <div style={{ fontSize: 14, color: "var(--text-muted)", textAlign: "center", marginBottom: 6 }}>
             Original space — points fixed, axes rotate
           </div>
           <div style={{ height: 250 }}>
@@ -136,7 +135,7 @@ export default function Stage1Intuition({ isDark, goToStage2 }) {
           </div>
         </div>
         <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "10px 12px" }}>
-          <div style={{ fontSize: 11, color: "var(--text-muted)", textAlign: "center", marginBottom: 6 }}>
+          <div style={{ fontSize: 14, color: "var(--text-muted)", textAlign: "center", marginBottom: 6 }}>
             Projected space — axes fixed, points shift
           </div>
           <div style={{ height: 250 }}>
@@ -151,7 +150,7 @@ export default function Stage1Intuition({ isDark, goToStage2 }) {
         borderRadius: 10, padding: "10px 16px", marginBottom: "0.75rem",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 13, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>Rotate axes</span>
+          <span style={{ fontSize: 14, color: "var(--text-secondary)", whiteSpace: "nowrap" }}>Rotate axes</span>
           <input
             type="range" min="0" max="179" step="1" value={angle}
             style={{ flex: 1 }}
@@ -167,7 +166,7 @@ export default function Stage1Intuition({ isDark, goToStage2 }) {
           background: "var(--metric-bg)", border: "0.5px solid var(--border)",
           borderRadius: 8, padding: "10px 14px", borderLeft: `3px solid ${GOLD}`,
         }}>
-          <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>PC1 variance captured</div>
+          <div style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 4 }}>PC1 variance captured</div>
           <div style={{ fontSize: 20, fontWeight: 500 }}>{pc1V.toFixed(3)}</div>
           <VarBar pct={pc1Pct} color={isClose ? GREEN : GOLD} />
         </div>
@@ -216,7 +215,7 @@ export default function Stage1Intuition({ isDark, goToStage2 }) {
         <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "10px 12px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
             <div style={{ width: 12, height: 12, borderRadius: 2, background: GOLD, flexShrink: 0 }} />
-            <span style={{ fontSize: 12, fontWeight: 500 }}>Projection onto PC1 — maximum variance ✓</span>
+            <span style={{ fontSize: 14, fontWeight: 500 }}>Projection onto PC1 — maximum variance ✓</span>
           </div>
           <div style={{ height: 130 }}>
             <Strip1DCanvas pts={PTS} angleDeg={IDEAL} axis="pc1" isDark={isDark} />
@@ -236,7 +235,7 @@ export default function Stage1Intuition({ isDark, goToStage2 }) {
         <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "10px 12px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
             <div style={{ width: 12, height: 12, borderRadius: 2, background: BLUE, flexShrink: 0 }} />
-            <span style={{ fontSize: 12, fontWeight: 500 }}>Projection onto PC2 — minimum variance ✗</span>
+            <span style={{ fontSize: 14 , fontWeight: 500 }}>Projection onto PC2 — minimum variance ✗</span>
           </div>
           <div style={{ height: 130 }}>
             <Strip1DCanvas pts={PTS} angleDeg={IDEAL} axis="pc2" isDark={isDark} />

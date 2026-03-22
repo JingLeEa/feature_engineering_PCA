@@ -56,8 +56,8 @@ export default function Strip1DCanvas({ pts, angleDeg, axis, isDark }) {
     // Variance annotation
     const vals = proj.map((p) => (axis === "pc1" ? p.pc1 : p.pc2));
     const v = varianceOf(vals);
-    ctx.fillStyle = isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.45)";
-    ctx.font = "11px system-ui"; ctx.textAlign = "left";
+    ctx.fillStyle = isDark ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.5)";
+    ctx.font = "13px system-ui"; ctx.textAlign = "left";
     ctx.fillText(`variance = ${v.toFixed(3)}`, pad, 16);
   });
 

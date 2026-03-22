@@ -37,7 +37,7 @@ export default function OriginalSpaceCanvas({ pts, angleDeg, isDark }) {
     const { sx: ax1, sy: ay1 } = toScreen(-cos * vl, -sin * vl, cx, cy, range, w, h, pad);
     const { sx: ax2, sy: ay2 } = toScreen( cos * vl,  sin * vl, cx, cy, range, w, h, pad);
     drawArrowLine(ctx, ax1, ay1, ax2, ay2, GOLD, 2.5);
-    ctx.fillStyle = GOLD; ctx.font = "500 11px system-ui"; ctx.textAlign = "left";
+    ctx.fillStyle = GOLD; ctx.font = "500 13px system-ui"; ctx.textAlign = "left";
     ctx.fillText("PC1", ax2 + 5, ay2 + 4);
 
     const { sx: bx1, sy: by1 } = toScreen( sin * vl, -cos * vl, cx, cy, range, w, h, pad);

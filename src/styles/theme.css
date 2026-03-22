@@ -7,7 +7,7 @@
   --border-strong:  rgba(0, 0, 0, 0.22);
   --text-primary:   #1a1a17;
   --text-secondary: #52524e;
-  --text-muted:     #9a9890;
+  --text-muted:     #84837c;
   --text-highlighted: #c0392b;
 }
 
@@ -20,6 +20,6 @@
   --border-strong:  rgba(255, 255, 255, 0.28);
   --text-primary:   #edece8;
   --text-secondary: #9a9890;
-  --text-muted:     #5c5b56;
+  --text-muted:     #797874;
   --text-highlighted: #e74c3c;
 }

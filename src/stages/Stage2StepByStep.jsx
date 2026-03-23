@@ -11,7 +11,7 @@ function InlineMath({ children }) {
   return <span dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
-const GOLD  = "#F5A623";
+const GOLD  = "#fb9d07";
 const BLUE  = "#4F8CFF";
 const GREEN = "#1D9E75";
 const RED   = "#E85D24";
@@ -297,6 +297,8 @@ export default function Stage2StepByStep({ isDark, goToStage1 }) {
   const [shapeKey, setShapeKey] = useState(null);
   const [step, setStep]         = useState(0);
   const [centered, setCentered] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
+  const stepBarRef = useRef(null);
 
   const pts = useMemo(() => (shapeKey ? SHAPES[shapeKey].generate() : []), [shapeKey]);
   const pca = useMemo(() => (pts.length ? computePCA3D(pts) : null), [pts]);
@@ -305,7 +307,11 @@ export default function Stage2StepByStep({ isDark, goToStage1 }) {
   const projPts     = pca ? projectPoints3D(centeredPts, pca.eigenvectors, 2) : [];
 
   if (!shapeKey) {
-    return <ShapePicker isDark={isDark} goToStage1={goToStage1} onSelect={(k) => { setShapeKey(k); setStep(0); setCentered(false); }} />;
+    return <ShapePicker isDark={isDark} goToStage1={goToStage1} onSelect={(k) => { setShapeKey(k); setStep(0); setCentered(false); setShowSummary(false); }} />;
+  }
+
+  if (showSummary) {
+    return <SummarySection pca={pca} centeredPts={centeredPts} onBackToShapes={() => { setShapeKey(null); setShowSummary(false); }} isDark={isDark} />;
   }
 
   const n = pts.length;
@@ -348,15 +354,16 @@ export default function Stage2StepByStep({ isDark, goToStage1 }) {
           ))}
         </div>
         <div style={{ fontSize: 15, color: "var(--text-secondary)", lineHeight: 1.7 }}>
-          We have <strong>N = {n}</strong> feature vectors{" "}
+          We have <InlineMath>{`N=${n}`}</InlineMath> feature vectors{" "}
           <InlineMath>{"\\{x_1, x_2, \\ldots, x_N\\}"}</InlineMath> where each{" "}
-          <strong><InlineMath>{"x_i"}</InlineMath></strong> is a <strong>{dim}×1</strong> vector.
-          Our goal is to find a mapping to a <strong>2×1</strong> vector — reducing from <strong>m = {dim}</strong> to <strong>k = 2</strong> dimensions —
+          <strong><InlineMath>{"x_i"}</InlineMath></strong> is a <InlineMath>{`${dim} \\times 1`}</InlineMath> vector.
+          Our goal is to find a mapping to a <InlineMath>{`2 \\times 1`}</InlineMath> vector — reducing from <InlineMath>{`m = ${dim}`}</InlineMath> to <InlineMath>{`k = 2`}</InlineMath> dimensions —
           while preserving as much variance as possible.
         </div>
       </div>
 
       {/* Step nav */}
+      <div ref={stepBarRef} />
       <StepBar current={step} total={4} />
       <div style={{ display: "flex", gap: 6, marginBottom: "2rem", flexWrap: "wrap" }}>
         {STEP_LABELS.map((label, i) => (
@@ -378,13 +385,102 @@ export default function Stage2StepByStep({ isDark, goToStage1 }) {
 
       {/* Prev / Next */}
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: "2rem" }}>
-        <button onClick={() => { if (step === 0) setShapeKey(null); else setStep(s => s - 1); }}>
+        <button onClick={() => {
+          if (step === 0) setShapeKey(null);
+          else { setStep(s => s - 1); stepBarRef.current?.scrollIntoView({ behavior: "smooth" }); }
+        }}>
           {step === 0 ? "← Back to shapes" : "← Previous"}
         </button>
-        <button onClick={() => { if (step === 3) setShapeKey(null); else setStep(s => s + 1); }} className="btn-primary">
-          {step === 3 ? "Choose another shape →" : "Next →"}
-        </button>
+        {step === 3 ? (
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={() => setShapeKey(null)}>Choose another shape</button>
+            <button className="btn-primary" onClick={() => setShowSummary(true)}>View Summary →</button>
+          </div>
+        ) : (
+          <button className="btn-primary" onClick={() => { setStep(s => s + 1); stepBarRef.current?.scrollIntoView({ behavior: "smooth" }); }}>
+            Next →
+          </button>
+        )}
       </div>
+    </div>
+  );
+}
+
+// ─── SUMMARY ──────────────────────────────────────────────────────────────────
+
+function SummarySection({ pca, centeredPts, onBackToShapes, isDark }) {
+  const keptPct = pca ? ((pca.eigenvalues[0] + pca.eigenvalues[1]) / pca.totalVar * 100).toFixed(1) : "—";
+
+  return (
+    <div style={{ maxWidth: 820, margin: "0 auto", padding: "2rem 1.5rem 5rem" }}>
+      <div style={{
+        fontSize: 12, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase",
+        color: "var(--text-muted)", background: "var(--surface)",
+        border: "0.5px solid var(--border)", borderRadius: 20,
+        padding: "3px 10px", display: "inline-block", marginBottom: "0.75rem",
+      }}>
+        Stage 2 — Summary
+      </div>
+      <h1 style={{ marginBottom: "0.5rem" }}>Summary: PCA in general</h1>
+      <p style={{ marginBottom: "1.5rem" }}>
+        Suppose we have <strong>N</strong> feature vectors{" "}
+        <InlineMath>{"\\{x_1, x_2, \\ldots, x_N\\}"}</InlineMath> where each{" "}
+        <strong><InlineMath>{"x_i"}</InlineMath></strong> is of dimension <InlineMath>{"m \\times 1"}</InlineMath> (m can be very large).
+        Our goal is to reduce every vector to dimension <InlineMath>{"k \\times 1"}</InlineMath> where <InlineMath>{"k \\ll m"}</InlineMath>.
+      </p>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem", marginBottom: "1.5rem" }}>
+        {[
+          {
+            n: "01", title: "Form the covariance matrix C",
+            body: <>Compute C from all N feature vectors: <InlineMath>{"C = \\frac{1}{N}\\sum_i (x_i - \\bar{x})(x_i - \\bar{x})^T"}</InlineMath>. C is of dimension m×m.</>,
+          },
+          {
+            n: "02", title: "Find eigenvectors and eigenvalues of C",
+            body: <>Solve <InlineMath>{"C\\mathbf{v} = \\lambda\\mathbf{v}"}</InlineMath>. This gives m eigenvectors <InlineMath>{"\\{v_1, v_2, \\ldots, v_m\\}"}</InlineMath> — the <strong>principal components</strong>. Each <InlineMath>{"v_i"}</InlineMath> is m×1.</>,
+          },
+          {
+            n: "03", title: "Rank by eigenvalue",
+            body: "Sort eigenvectors by their eigenvalue (descending). The eigenvector with the largest eigenvalue is PC1 — the direction of maximum variance.",
+          },
+          {
+            n: "04", title: "Select top k eigenvectors",
+            body: <>Choose the k eigenvectors with the largest eigenvalues. These form a projection matrix <InlineMath>{"W"}</InlineMath> of dimension <InlineMath>{"m \\times k"}</InlineMath>.</>,
+          },
+          {
+            n: "05", title: "Project each feature vector",
+            body: <>For each <InlineMath>{"x_i"}</InlineMath>, compute the new k-dimensional coordinates: <InlineMath>{"y_i = W^T(x_i - \\bar{x})"}</InlineMath>. Since <InlineMath>{"k \\ll m"}</InlineMath>, the feature vector is greatly reduced in size.</>,
+          },
+        ].map(({ n, title, body }) => (
+          <div key={n} style={{
+            display: "grid", gridTemplateColumns: "36px 1fr",
+            background: "var(--surface)", border: "0.5px solid var(--border)",
+            borderRadius: 10, overflow: "hidden",
+          }}>
+            <div style={{
+              background: "var(--metric-bg)", display: "flex", alignItems: "center",
+              justifyContent: "center", fontSize: 15, fontWeight: 600,
+              color: "var(--text-muted)", borderRight: "0.5px solid var(--border)",
+            }}>{n}</div>
+            <div style={{ padding: "10px 14px" }}>
+              <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 4 }}>{title}</div>
+              <div style={{ fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.65 }}>{body}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {pca && (
+        <Callout borderColor={GOLD} bg={isDark ? "rgba(245,166,35,0.07)" : "rgba(245,166,35,0.06)"}>
+          <strong>In this example:</strong> m = 3, k = 2, N = {centeredPts.length}.
+          We retained <strong>{keptPct}%</strong> of the total variance with just 2 components out of 3.
+          In practice, datasets with m = 100–10,000 features can often be compressed to k = 10–50
+          components while retaining 80%+ of the information.
+        </Callout>
+      )}
+
+      <Divider />
+      <button onClick={onBackToShapes}>← Back to Shapes</button>
     </div>
   );
 }
@@ -478,7 +574,9 @@ function StepMean({ pts, pca, centered, setCentered, centeredPts, isDark }) {
         <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "1rem 1.25rem" }}>
           <div style={{ fontSize: 15, color: "var(--text-muted)", marginBottom: 10 }}>Computed mean (N = {n} points):</div>
           <div style={{ display: "flex", gap: 20, marginBottom: 12 }}>
-            {[["x̄", mx], ["ȳ", my], ["z̄", mz]].map(([label, val]) => (
+            {[[<InlineMath>{"\\bar{x}"}</InlineMath>, mx], 
+              [<InlineMath>{"\\bar{y}"}</InlineMath>, my], 
+              [<InlineMath>{"\\bar{z}"}</InlineMath>, mz]].map(([label, val]) => (
               <div key={label} style={{ textAlign: "center" }}>
                 <div style={{ fontSize: 15, color: "var(--text-muted)" }}>{label}</div>
                 <div style={{ fontSize: 22, fontWeight: 500, color: RED }}>{val.toFixed(3)}</div>
@@ -488,9 +586,9 @@ function StepMean({ pts, pca, centered, setCentered, centeredPts, isDark }) {
           <div style={{ fontSize: 15, color: "var(--text-muted)", lineHeight: 1.6 }}>
             New centered point:<br />
             <span style={{ fontFamily: "monospace" }}>
-              xᵢ′ = xᵢ − {mx.toFixed(2)}<br />
-              yᵢ′ = yᵢ − {my.toFixed(2)}<br />
-              zᵢ′ = zᵢ − {mz.toFixed(2)}
+              <InlineMath>{`x_i' = x_i - ${mx.toFixed(2)}`}</InlineMath><br />
+              <InlineMath>{`y_i' = y_i - ${my.toFixed(2)}`}</InlineMath><br />
+              <InlineMath>{`z_i' = z_i - ${mz.toFixed(2)}`}</InlineMath>
             </span>
           </div>
         </div>
@@ -674,7 +772,7 @@ function StepEigen({ pca, centeredPts, isDark }) {
       <h2>Step 3: Eigendecomposition</h2>
       <br />
       <p style={{ marginBottom: "1rem" }}>
-        We factorise the covariance matrix <strong>C</strong> into its <strong>eigenvalues</strong> and <strong>eigenvectors</strong>:
+        We factorise the covariance matrix <InlineMath>{`\\textcolor{${GOLD}}{C}`}</InlineMath> into its <strong>eigenvalues</strong> and <strong>eigenvectors</strong>:
       </p>
 
       {/* Equation */}
@@ -689,9 +787,9 @@ function StepEigen({ pca, centeredPts, isDark }) {
           { throwOnError: false, displayMode: true }
         ) }} />
         <div style={{ fontSize: 15, color: "var(--text-secondary)", fontFamily: "system-ui", marginTop: 4, lineHeight: 1.6 }}>
-          <span style={{ color: GOLD }}>C</span> = covariance matrix &nbsp;·&nbsp;
-          <span style={{ color: BLUE }}> v</span> = eigenvector (a direction) &nbsp;·&nbsp;
-          <span style={{ color: RED }}> λ</span> = eigenvalue (variance in that direction)
+          <InlineMath>{`\\textcolor{${GOLD}}{C}`}</InlineMath> = covariance matrix &nbsp;·&nbsp;
+          <InlineMath>{`\\textcolor{${BLUE}}{\\mathbf{v}}`}</InlineMath> = eigenvector (a direction) &nbsp;·&nbsp;
+          <InlineMath>{`\\textcolor{${RED}}{\\lambda}`}</InlineMath> = eigenvalue (variance in that direction)
         </div>
       </div>
 
@@ -701,12 +799,13 @@ function StepEigen({ pca, centeredPts, isDark }) {
         borderRadius: 12, padding: "1rem 1.5rem", marginBottom: "1rem",
       }}>
         <div style={{ fontSize: 15, marginBottom: 15 }}>
-          For our 3D data, C is 3×3, so there are <strong>3 eigenvector–eigenvalue pairs</strong>:
+          For our 3D data, <InlineMath>{`\\textcolor{${GOLD}}{C}`}</InlineMath> is <InlineMath>{`3 \\times 3`}</InlineMath>, 
+          so there are <strong>3 eigenvector–eigenvalue pairs</strong>:
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
           <div>
             <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 8 }}>
-              Eigenvectors <span style={{ color: BLUE }}>(vᵢ)</span> — principal directions
+              Eigenvectors <InlineMath>{`\\textcolor{${BLUE}}{v_i}`}</InlineMath> — principal directions
             </div>
             <ul style={{ fontSize: 15, lineHeight: 1.8 }}>
               <li>Represent the principal directions or axes of the data cloud.</li>
@@ -717,7 +816,7 @@ function StepEigen({ pca, centeredPts, isDark }) {
           </div>
           <div>
             <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 8 }}>
-              Eigenvalues <span style={{ color: RED }}>(λᵢ)</span> — strength of each direction
+              Eigenvalues <InlineMath>{`\\textcolor{${RED}}{\\lambda_i}`}</InlineMath> — strength of each direction
             </div>
             <ul style={{ fontSize: 15, lineHeight: 1.8 }}>
               <li>Indicate the <strong>variance</strong> (spread) along each principal direction.</li>
@@ -889,65 +988,6 @@ function StepReduction({ pca, centeredPts, projPts, isDark }) {
         4. Projected onto top-2 eigenvectors → dropped the least informative dimension
       </Callout>
 
-      <Divider />
-
-      {/* ── SUMMARY ── */}
-      <h2>Summary: PCA in general</h2>
-      <br />
-      <p style={{ marginBottom: "1rem" }}>
-        Suppose we have <strong>N</strong> feature vectors{" "}
-        <InlineMath>{"\\{x_1, x_2, \\ldots, x_N\\}"}</InlineMath> where each{" "}
-        <strong><InlineMath>{"x_i"}</InlineMath></strong> is of dimension <strong>m×1</strong> (m can be very large).
-        Our goal is to reduce every vector to dimension <strong>k×1</strong> where <InlineMath>{"k \\ll m"}</InlineMath>.
-      </p>
-
-      <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem", marginBottom: "1.5rem" }}>
-        {[
-          {
-            n: "01", title: "Form the covariance matrix C",
-            body: <>Compute C from all N feature vectors: <InlineMath>{"C = \\frac{1}{N}\\sum_i (x_i - \\bar{x})(x_i - \\bar{x})^T"}</InlineMath>. C is of dimension m×m.</>,
-          },
-          {
-            n: "02", title: "Find eigenvectors and eigenvalues of C",
-            body: <>Solve <InlineMath>{"C\\mathbf{v} = \\lambda\\mathbf{v}"}</InlineMath>. This gives m eigenvectors <InlineMath>{"\\{v_1, v_2, \\ldots, v_m\\}"}</InlineMath> — the <strong>principal components</strong>. Each <InlineMath>{"v_i"}</InlineMath> is m×1.</>,
-          },
-          {
-            n: "03", title: "Rank by eigenvalue",
-            body: "Sort eigenvectors by their eigenvalue (descending). The eigenvector with the largest eigenvalue is PC1 — the direction of maximum variance.",
-          },
-          {
-            n: "04", title: "Select top k eigenvectors",
-            body: <>Choose the k eigenvectors with the largest eigenvalues. These form a projection matrix <InlineMath>{"W"}</InlineMath> of dimension m×k.</>,
-          },
-          {
-            n: "05", title: "Project each feature vector",
-            body: <>For each <InlineMath>{"x_i"}</InlineMath>, compute the new k-dimensional coordinates: <InlineMath>{"y_i = W^T(x_i - \\bar{x})"}</InlineMath>. Since <InlineMath>{"k \\ll m"}</InlineMath>, the feature vector is greatly reduced in size.</>,
-          },
-        ].map(({ n, title, body }) => (
-          <div key={n} style={{
-            display: "grid", gridTemplateColumns: "36px 1fr",
-            background: "var(--surface)", border: "0.5px solid var(--border)",
-            borderRadius: 10, overflow: "hidden",
-          }}>
-            <div style={{
-              background: "var(--metric-bg)", display: "flex", alignItems: "center",
-              justifyContent: "center", fontSize: 15, fontWeight: 600,
-              color: "var(--text-muted)", borderRight: "0.5px solid var(--border)",
-            }}>{n}</div>
-            <div style={{ padding: "10px 14px" }}>
-              <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 4 }}>{title}</div>
-              <div style={{ fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.65 }}>{body}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <Callout borderColor={GOLD} bg={isDark ? "rgba(245,166,35,0.07)" : "rgba(245,166,35,0.06)"}>
-        <strong>In this example:</strong> m = 3, k = 2, N = {centeredPts.length}.
-        We retained <strong>{keptPct}%</strong> of the total variance with just 2 components out of 3.
-        In practice, datasets with m = 100–10,000 features can often be compressed to k = 10–50
-        components while retaining 90%+ of the information.
-      </Callout>
     </div>
   );
 }

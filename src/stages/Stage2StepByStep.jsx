@@ -31,7 +31,7 @@ function isoProject(x, y, z, azimuth, elevation, scale, ox, oy) {
 
 // ─── ROTATABLE 3D SCATTER CANVAS ─────────────────────────────────────────────
 
-function Scatter3D({ pts, isDark, eigenvectors, showAxes, showMean }) {
+function Scatter3D({ pts, isDark, eigenvectors, showAxes, showMean, highlightIdx }) {
   const ref        = useRef(null);
   const dragging   = useRef(false);
   const lastPos    = useRef({ x: 0, y: 0 });
@@ -107,7 +107,7 @@ function Scatter3D({ pts, isDark, eigenvectors, showAxes, showMean }) {
       ctx.strokeStyle = RED; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(sx - 9, sy); ctx.lineTo(sx + 9, sy); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(sx, sy - 9); ctx.lineTo(sx, sy + 9); ctx.stroke();
-      ctx.fillStyle = RED; ctx.font = "bold 10px system-ui"; ctx.textAlign = "left";
+      ctx.fillStyle = BLUE; ctx.font = "bold 10px system-ui"; ctx.textAlign = "left";
       ctx.fillText("mean", sx + 7, sy - 4);
     }
 
@@ -139,12 +139,20 @@ function Scatter3D({ pts, isDark, eigenvectors, showAxes, showMean }) {
     }
 
     // Data points — painter's algorithm by depth
-    const projected = pts.map(p => ({ ...proj(p.x, p.y, p.z) }));
+    const projected = pts.map((p, i) => ({ ...proj(p.x, p.y, p.z), idx: i }));
     projected.sort((a, b) => a.depth - b.depth);
-    projected.forEach(({ sx, sy }) => {
+    const hlPoint3d = highlightIdx != null ? projected.find(p => p.idx === highlightIdx) : null;
+    projected.forEach(({ sx, sy, idx }) => {
+      if (idx === highlightIdx) return;
       ctx.beginPath(); ctx.arc(sx, sy, 2.5, 0, Math.PI * 2);
       ctx.fillStyle = "rgba(195,29,29,0.65)"; ctx.fill();
     });
+    if (hlPoint3d) {
+      ctx.strokeStyle = "#ff3bff"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(hlPoint3d.sx, hlPoint3d.sy, 9, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(hlPoint3d.sx, hlPoint3d.sy, 5, 0, Math.PI * 2);
+      ctx.fillStyle = "#ff3bff"; ctx.fill();
+    }
 
     // Drag hint
     ctx.fillStyle = isDark ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.2)";
@@ -185,7 +193,7 @@ function Scatter3D({ pts, isDark, eigenvectors, showAxes, showMean }) {
 
 // ─── 2D SCATTER CANVAS ────────────────────────────────────────────────────────
 
-function Scatter2D({ projPts, isDark }) {
+function Scatter2D({ projPts, isDark, highlightIdx }) {
   const ref = useRef(null);
   useEffect(() => {
     const canvas = ref.current; if (!canvas) return;
@@ -217,17 +225,25 @@ function Scatter2D({ projPts, isDark }) {
     ctx.strokeStyle = BLUE; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.moveTo(cx, pad); ctx.lineTo(cx, h - pad); ctx.stroke();
     ctx.fillStyle = BLUE; ctx.fillText("PC2", cx + 4, pad);
-    projPts.forEach(({ pc1, pc2 }) => {
+    let hlPt2d = null;
+    projPts.forEach(({ pc1, pc2 }, i) => {
+      if (i === highlightIdx) { hlPt2d = { sx: toSx(pc1), sy: toSy(pc2) }; return; }
       ctx.beginPath(); ctx.arc(toSx(pc1), toSy(pc2), 2.5, 0, Math.PI * 2);
       ctx.fillStyle = "rgba(195,29,29,0.6)"; ctx.fill();
     });
+    if (hlPt2d) {
+      ctx.strokeStyle = "#ff3bff"; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(hlPt2d.sx, hlPt2d.sy, 9, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(hlPt2d.sx, hlPt2d.sy, 5, 0, Math.PI * 2);
+      ctx.fillStyle = "#ff3bff"; ctx.fill();
+    }
   });
   return <canvas ref={ref} style={{ display: "block", width: "100%", height: "100%" }} />;
 }
 
 // ─── MATRIX DISPLAY ──────────────────────────────────────────────────────────
 
-function MatrixDisplay({ rows, label, color = "var(--text-primary)", size = 13 }) {
+function MatrixDisplay({ rows, label, color = "var(--text-primary)", size = 15 }) {
   return (
     <div style={{ display: "inline-flex", alignItems: "center", gap: 8, fontFamily: "monospace" }}>
       {label && <span style={{ fontSize: size, color: "var(--text-muted)", marginRight: 4 }}>{label} =</span>}
@@ -298,7 +314,13 @@ export default function Stage2StepByStep({ isDark, goToStage1 }) {
   const [step, setStep]         = useState(0);
   const [centered, setCentered] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
-  const stepBarRef = useRef(null);
+  const stepBarRef    = useRef(null);
+  const stepMounted   = useRef(false);
+
+  useEffect(() => {
+    if (!stepMounted.current) { stepMounted.current = true; return; }
+    stepBarRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [step]);
 
   const pts = useMemo(() => (shapeKey ? SHAPES[shapeKey].generate() : []), [shapeKey]);
   const pca = useMemo(() => (pts.length ? computePCA3D(pts) : null), [pts]);
@@ -355,8 +377,8 @@ export default function Stage2StepByStep({ isDark, goToStage1 }) {
         </div>
         <div style={{ fontSize: 15, color: "var(--text-secondary)", lineHeight: 1.7 }}>
           We have <InlineMath>{`N=${n}`}</InlineMath> feature vectors{" "}
-          <InlineMath>{"\\{x_1, x_2, \\ldots, x_N\\}"}</InlineMath> where each{" "}
-          <strong><InlineMath>{"x_i"}</InlineMath></strong> is a <InlineMath>{`${dim} \\times 1`}</InlineMath> vector.
+          <InlineMath>{"\\{p_1, p_2, \\ldots, p_N\\}"}</InlineMath> where each{" "}
+          <strong><InlineMath>{"p_i"}</InlineMath></strong> is a <InlineMath>{`${dim} \\times 1`}</InlineMath> vector.
           Our goal is to find a mapping to a <InlineMath>{`2 \\times 1`}</InlineMath> vector — reducing from <InlineMath>{`m = ${dim}`}</InlineMath> to <InlineMath>{`k = 2`}</InlineMath> dimensions —
           while preserving as much variance as possible.
         </div>
@@ -387,7 +409,7 @@ export default function Stage2StepByStep({ isDark, goToStage1 }) {
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: "2rem" }}>
         <button onClick={() => {
           if (step === 0) setShapeKey(null);
-          else { setStep(s => s - 1); stepBarRef.current?.scrollIntoView({ behavior: "smooth" }); }
+          else setStep(s => s - 1);
         }}>
           {step === 0 ? "← Back to shapes" : "← Previous"}
         </button>
@@ -397,7 +419,7 @@ export default function Stage2StepByStep({ isDark, goToStage1 }) {
             <button className="btn-primary" onClick={() => setShowSummary(true)}>View Summary →</button>
           </div>
         ) : (
-          <button className="btn-primary" onClick={() => { setStep(s => s + 1); stepBarRef.current?.scrollIntoView({ behavior: "smooth" }); }}>
+          <button className="btn-primary" onClick={() => setStep(s => s + 1)}>
             Next →
           </button>
         )}
@@ -422,10 +444,10 @@ function SummarySection({ pca, centeredPts, onBackToShapes, isDark }) {
         Stage 2 — Summary
       </div>
       <h1 style={{ marginBottom: "0.5rem" }}>Summary: PCA in general</h1>
-      <p style={{ marginBottom: "1.5rem" }}>
+      <p style={{ marginBottom: "1.5rem", color: "var(--primary)" }}>
         Suppose we have <strong>N</strong> feature vectors{" "}
-        <InlineMath>{"\\{x_1, x_2, \\ldots, x_N\\}"}</InlineMath> where each{" "}
-        <strong><InlineMath>{"x_i"}</InlineMath></strong> is of dimension <InlineMath>{"m \\times 1"}</InlineMath> (m can be very large).
+        <InlineMath>{"\\{p_1, p_2, \\ldots, p_N\\}"}</InlineMath> where each{" "}
+        <strong><InlineMath>{"p_i"}</InlineMath></strong> is of dimension <InlineMath>{"m \\times 1"}</InlineMath> (m can be very large).
         Our goal is to reduce every vector to dimension <InlineMath>{"k \\times 1"}</InlineMath> where <InlineMath>{"k \\ll m"}</InlineMath>.
       </p>
 
@@ -433,15 +455,16 @@ function SummarySection({ pca, centeredPts, onBackToShapes, isDark }) {
         {[
           {
             n: "01", title: "Form the covariance matrix C",
-            body: <>Compute C from all N feature vectors: <InlineMath>{"C = \\frac{1}{N}\\sum_i (x_i - \\bar{x})(x_i - \\bar{x})^T"}</InlineMath>. C is of dimension m×m.</>,
+            body: <>Compute <InlineMath>{"C"}</InlineMath> from all N feature vectors: <InlineMath>{"C = \\frac{1}{N}\\sum_i (p_i - \\bar{p})(p_i - \\bar{p})^T"}</InlineMath>. 
+            <InlineMath>{"C"}</InlineMath> is of dimension <InlineMath>{"m \\times m"}</InlineMath>.</>,
           },
           {
             n: "02", title: "Find eigenvectors and eigenvalues of C",
-            body: <>Solve <InlineMath>{"C\\mathbf{v} = \\lambda\\mathbf{v}"}</InlineMath>. This gives m eigenvectors <InlineMath>{"\\{v_1, v_2, \\ldots, v_m\\}"}</InlineMath> — the <strong>principal components</strong>. Each <InlineMath>{"v_i"}</InlineMath> is m×1.</>,
+            body: <>Solve <InlineMath>{"C\\mathbf{v} = \\lambda\\mathbf{v}"}</InlineMath>. This gives m eigenvectors <InlineMath>{"\\{v_1, v_2, \\ldots, v_m\\}"}</InlineMath> : the <strong>principal components</strong>. Each <InlineMath>{"v_i"}</InlineMath> is <InlineMath>{"m \\times 1"}</InlineMath>.</>,
           },
           {
             n: "03", title: "Rank by eigenvalue",
-            body: "Sort eigenvectors by their eigenvalue (descending). The eigenvector with the largest eigenvalue is PC1 — the direction of maximum variance.",
+            body: "Sort eigenvectors by their eigenvalue (descending). The eigenvector with the largest eigenvalue is PC1: the direction of maximum variance.",
           },
           {
             n: "04", title: "Select top k eigenvectors",
@@ -449,7 +472,7 @@ function SummarySection({ pca, centeredPts, onBackToShapes, isDark }) {
           },
           {
             n: "05", title: "Project each feature vector",
-            body: <>For each <InlineMath>{"x_i"}</InlineMath>, compute the new k-dimensional coordinates: <InlineMath>{"y_i = W^T(x_i - \\bar{x})"}</InlineMath>. Since <InlineMath>{"k \\ll m"}</InlineMath>, the feature vector is greatly reduced in size.</>,
+            body: <>For each <InlineMath>{"p_i"}</InlineMath>, compute the new k-dimensional coordinates: <InlineMath>{"y_i = W^T(p_i - \\bar{p})"}</InlineMath>. Since <InlineMath>{"k \\ll m"}</InlineMath>, the feature vector is greatly reduced in size.</>,
           },
         ].map(({ n, title, body }) => (
           <div key={n} style={{
@@ -464,7 +487,7 @@ function SummarySection({ pca, centeredPts, onBackToShapes, isDark }) {
             }}>{n}</div>
             <div style={{ padding: "10px 14px" }}>
               <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 4 }}>{title}</div>
-              <div style={{ fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.65 }}>{body}</div>
+              <div style={{ fontSize: 15, lineHeight: 1.65 }}>{body}</div>
             </div>
           </div>
         ))}
@@ -561,13 +584,13 @@ function StepMean({ pts, pca, centered, setCentered, centeredPts, isDark }) {
         {/* Formula */}
         <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "1rem 1.25rem" }}>
           <div style={{ fontSize: 15, color: "var(--text-muted)", marginBottom: 10 }}>Formula:</div>
-          <MathBlock latex={`\\textcolor{${RED}}{\\bar{x}} = \\frac{1}{N}\\sum_{i=1}^{N} x_i`} />
+          <MathBlock latex={`\\textcolor{${RED}}{\\bar{p}} = \\frac{1}{N}\\sum_{i=1}^{N} p_i`} />
           <div style={{ fontSize: 15, color: "var(--text-secondary)", lineHeight: 1.7, marginTop: 8 }}>
             For each dimension, sum all N = {n} values and divide by N.
-            The mean vector <InlineMath>{`\\textcolor{${RED}}{\\bar{x}}`}</InlineMath> is then subtracted
+            The mean vector <InlineMath>{`\\textcolor{${RED}}{\\bar{p}}`}</InlineMath> is then subtracted
             from every point:
           </div>
-          <MathBlock latex={`x_i' = x_i - \\textcolor{${RED}}{\\bar{x}}`} />
+          <MathBlock latex={`p_i' = p_i - \\textcolor{${RED}}{\\bar{p}}`} />
         </div>
 
         {/* Computed values */}
@@ -667,34 +690,34 @@ function StepCovariance({ pca, centeredPts, isDark }) {
       <h3>Maximising spread (the squared projection)</h3>
       <br />
       <p style={{ marginBottom: "0.75rem" }}>
-        We want to find a direction <strong>v</strong> such that the data is as spread out as possible
-        when projected onto it. The projection of a point <strong>x</strong> onto direction <strong>v</strong> is:
+        We want to <span style={{ color: RED }}>find a direction v</span> such that the data is as spread out as possible
+        when projected onto it. The projection of a point <strong>p</strong> onto direction <strong>v</strong> is:
       </p>
-      <MathBlock label="Projection (scalar):" latex={"\\mathbf{v}^T\\mathbf{x} \\qquad (\\mathbf{v}^T \\text{ is } 1{\\times}n,\\ \\mathbf{x} \\text{ is } n{\\times}1 \\to \\text{scalar})"} />
+      <MathBlock label="Projection (scalar):" latex={"\\mathbf{v}^T\\mathbf{p} \\qquad (\\mathbf{v}^T \\text{ is } 1{\\times}n,\\ \\mathbf{p} \\text{ is } n{\\times}1 \\to \\text{scalar})"} />
 
       <p style={{ margin: "0.75rem 0" }}>
         To maximise spread we maximise the <strong>squared projection</strong>:
       </p>
-      <MathBlock latex={"(\\mathbf{v}^T\\mathbf{x})^2 = (\\mathbf{v}^T\\mathbf{x})(\\mathbf{v}^T\\mathbf{x})"} />
+      <MathBlock latex={"(\\mathbf{v}^T\\mathbf{p})^2 = (\\mathbf{v}^T\\mathbf{p})(\\mathbf{v}^T\\mathbf{p})"} />
 
       <p style={{ margin: "0.75rem 0" }}>
-        Since <InlineMath>{"\\mathbf{v}^T\\mathbf{x}"}</InlineMath> is a scalar, its transpose equals itself:{" "}
-        <InlineMath>{"\\mathbf{v}^T\\mathbf{x} = (\\mathbf{v}^T\\mathbf{x})^T = \\mathbf{x}^T\\mathbf{v}"}</InlineMath>.
+        Since <InlineMath>{"\\mathbf{v}^T\\mathbf{p}"}</InlineMath> is a scalar, its transpose equals itself:{" "}
+        <InlineMath>{"\\mathbf{v}^T\\mathbf{p} = (\\mathbf{v}^T\\mathbf{p})^T = \\mathbf{p}^T\\mathbf{v}"}</InlineMath>.
         Using this and the associative property:
       </p>
-      <MathBlock latex={"(\\mathbf{v}^T\\mathbf{x})^2 = (\\mathbf{v}^T\\mathbf{x})(\\mathbf{x}^T\\mathbf{v}) = \\mathbf{v}^T(\\mathbf{x}\\mathbf{x}^T)\\mathbf{v}"} />
+      <MathBlock latex={"(\\mathbf{v}^T\\mathbf{p})^2 = (\\mathbf{v}^T\\mathbf{p})(\\mathbf{p}^T\\mathbf{v}) = \\mathbf{v}^T(\\mathbf{p}\\mathbf{p}^T)\\mathbf{v}"} />
 
       <p style={{ margin: "0.75rem 0" }}>
         Subtracting the mean (from Step 1) to capture true spread:
       </p>
-      <MathBlock latex={"\\mathbf{v}^T(\\mathbf{x} - \\bar{\\mathbf{x}})(\\mathbf{x} - \\bar{\\mathbf{x}})^T\\mathbf{v}"} />
+      <MathBlock latex={"\\mathbf{v}^T(\\mathbf{p} - \\bar{\\mathbf{p}})(\\mathbf{p} - \\bar{\\mathbf{p}})^T\\mathbf{v}"} />
 
       <p style={{ margin: "0.75rem 0" }}>
         Since we have <strong>N</strong> points, we take the <em>average</em> (expected value) across the whole dataset.
         Because <strong>v</strong> is the direction we are searching for (not part of the data), it can be
         factored out of the expectation:
       </p>
-      <MathBlock latex={`\\mathbb{E}\\left\\{\\mathbf{v}^T(\\mathbf{x}-\\bar{\\mathbf{x}})(\\mathbf{x}-\\bar{\\mathbf{x}})^T\\mathbf{v}\\right\\} = \\mathbf{v}^T \\textcolor{${GOLD}}{\\underbrace{\\mathbb{E}\\left\\{(\\mathbf{x}-\\bar{\\mathbf{x}})(\\mathbf{x}-\\bar{\\mathbf{x}})^T\\right\\}}_{C}} \\mathbf{v} = \\mathbf{v}^T\\textcolor{${GOLD}}{C}\\mathbf{v}`} />
+      <MathBlock latex={`\\mathbb{E}\\left\\{\\mathbf{v}^T(\\mathbf{p}-\\bar{\\mathbf{p}})(\\mathbf{p}-\\bar{\\mathbf{p}})^T\\mathbf{v}\\right\\} = \\mathbf{v}^T \\textcolor{${GOLD}}{\\underbrace{\\mathbb{E}\\left\\{(\\mathbf{p}-\\bar{\\mathbf{p}})(\\mathbf{p}-\\bar{\\mathbf{p}})^T\\right\\}}_{C}} \\mathbf{v} = \\mathbf{v}^T\\textcolor{${GOLD}}{C}\\mathbf{v}`} />
 
       <Callout borderColor={GOLD} bg={isDark ? "rgba(245,166,35,0.07)" : "rgba(245,166,35,0.06)"}>
         The highlighted term <strong style={{ color: GOLD }}>C</strong> is the <strong>covariance matrix</strong>.
@@ -708,7 +731,7 @@ function StepCovariance({ pca, centeredPts, isDark }) {
       {/* ── COVARIANCE FORMULA ── */}
       <h3>The covariance matrix C</h3>
       <br />
-      <MathBlock label="Definition:" latex={"C = \\frac{1}{N}\\sum_{i=1}^{N}(\\mathbf{x}_i - \\bar{\\mathbf{x}})(\\mathbf{x}_i - \\bar{\\mathbf{x}})^T"} />
+      <MathBlock label="Definition:" latex={"C = \\frac{1}{N}\\sum_{i=1}^{N}(\\mathbf{p}_i - \\bar{\\mathbf{p}})(\\mathbf{p}_i - \\bar{\\mathbf{p}})^T"} />
       <p style={{ margin: "0.75rem 0 1rem" }}>
         For our 3D data, <strong>C</strong> is a symmetric 3×3 matrix:
       </p>
@@ -716,9 +739,9 @@ function StepCovariance({ pca, centeredPts, isDark }) {
       {/* Properties */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: "1rem" }}>
         {[
-          { label: "Diagonal entries", desc: "Var(xᵢ) — variance of each individual dimension.", color: GOLD },
-          { label: "Off-diagonal entries", desc: "Cov(xᵢ, xⱼ) — how two dimensions change together. Positive = same direction, negative = opposite.", color: BLUE },
-          { label: "Symmetry", desc: "Cᵢⱼ = Cⱼᵢ always. The matrix is always symmetric around the diagonal.", color: GREEN },
+          { label: "Diagonal entries", desc: <><InlineMath>{"C_{kk} = \\text{Var}(x_k)"}</InlineMath> — variance of the k-th dimension (x, y, or z).</>, color: GOLD },
+          { label: "Off-diagonal entries", desc: <><InlineMath>{"C_{kl} = \\text{Cov}(x_k,\\, x_l),\\; k \\neq l"}</InlineMath> — how two dimensions change together. Positive = same direction, negative = opposite.</>, color: BLUE },
+          { label: "Symmetry", desc: <><InlineMath>{"C_{kl} = C_{lk}"}</InlineMath> always. The matrix is always symmetric around the diagonal.</>, color: GREEN },
         ].map(({ label, desc, color }) => (
           <div key={label} style={{
             background: "var(--surface)", borderLeft: `3px solid ${color}`,
@@ -733,17 +756,19 @@ function StepCovariance({ pca, centeredPts, isDark }) {
 
       {/* Computed matrix */}
       <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "1rem 1.5rem", marginBottom: "1rem" }}>
-        <div style={{ fontSize: 15, color: "var(--text-muted)", marginBottom: 12 }}>
-          Computed covariance matrix C (N = {n} centered points):
-        </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "1.5rem", alignItems: "start" }}>
-          <div style={{ overflowX: "auto" }}>
-            <MatrixDisplay rows={C.map(row => row)} label="C" color="var(--text-primary)" />
+          <div>
+            <div style={{ fontSize: 15, color: "var(--text-muted)", marginBottom: 12 }}>
+              Computed covariance matrix C (N = {n} centered points):
+            </div>
+            <div style={{ overflowX: "auto" }}>
+              <MatrixDisplay rows={C.map(row => row)} label="C" color="var(--text-primary)" />
+            </div>
           </div>
           <div>
-            <div style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 6 }}>Diagonal (variances):</div>
+            <div style={{ fontSize: 15, color: "var(--text-muted)", marginBottom: 6 }}>Diagonal (variances):</div>
             {["Var(x)", "Var(y)", "Var(z)"].map((l, i) => (
-              <div key={i} style={{ fontSize: 13, marginBottom: 4 }}>
+              <div key={i} style={{ fontSize: 15, marginBottom: 4 }}>
                 <span style={{ color: "var(--text-muted)" }}>{l} = </span>
                 <strong style={{ color: GOLD }}>{C[i][i].toFixed(4)}</strong>
               </div>
@@ -805,7 +830,7 @@ function StepEigen({ pca, centeredPts, isDark }) {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
           <div>
             <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 8 }}>
-              Eigenvectors <InlineMath>{`\\textcolor{${BLUE}}{v_i}`}</InlineMath> — principal directions
+              Eigenvectors <InlineMath>{`\\textcolor{${BLUE}}{\\mathbf{v_i}}`}</InlineMath> — principal directions
             </div>
             <ul style={{ fontSize: 15, lineHeight: 1.8 }}>
               <li>Represent the principal directions or axes of the data cloud.</li>
@@ -848,7 +873,7 @@ function StepEigen({ pca, centeredPts, isDark }) {
                 return (
                   <tr key={i} style={{ borderBottom: "0.5px solid var(--border)" }}>
                     <td style={{ padding: "8px 10px" }}>
-                      <span style={{ color: colors[i], fontWeight: 500 }}>PC{i + 1}</span>
+                      <span style={{ color: colors[i], fontWeight: 500 }}><InlineMath>{`\\mathbf{v_${i+1}}`}</InlineMath> (PC{i + 1})</span>
                     </td>
                     <td style={{ padding: "8px", fontFamily: "monospace", fontSize: 14 }}>
                       [{v.map(x => x.toFixed(3)).join(", ")}]
@@ -911,8 +936,9 @@ function StepEigen({ pca, centeredPts, isDark }) {
 // ─── STEP 4: DIMENSION REDUCTION ──────────────────────────────────────────────
 
 function StepReduction({ pca, centeredPts, projPts, isDark }) {
+  const [pickedIdx, setPickedIdx] = useState(0);
   if (!pca) return null;
-  const { eigenvalues, totalVar } = pca;
+  const { eigenvalues, eigenvectors, mean3, totalVar } = pca;
   const kept    = eigenvalues[0] + eigenvalues[1];
   const keptPct = (kept / totalVar * 100).toFixed(1);
   const lostPct = (eigenvalues[2] / totalVar * 100).toFixed(1);
@@ -934,16 +960,16 @@ function StepReduction({ pca, centeredPts, projPts, isDark }) {
         <div style={{ color: "var(--text-muted)", fontSize: 15, marginBottom: 10, fontFamily: "system-ui" }}>Projection formula:</div>
         <div style={{ fontSize: 16 }}>
           <div dangerouslySetInnerHTML={{ __html: katex.renderToString(
-            `\\textcolor{${GOLD}}{pc_1} = \\textcolor{${GOLD}}{\\mathbf{v}_1}^T \\cdot \\mathbf{x}' = v_{1x}x' + v_{1y}y' + v_{1z}z'`,
+            `\\textcolor{${GOLD}}{\\mathbf{p_{pc1}}} = \\textcolor{${GOLD}}{\\mathbf{v}_1}^T \\cdot \\mathbf{p}' = v_{1x}x' + v_{1y}y' + v_{1z}z'`,
             { throwOnError: false, displayMode: true }
           ) }} />
           <div dangerouslySetInnerHTML={{ __html: katex.renderToString(
-            `\\textcolor{${BLUE}}{pc_2} = \\textcolor{${BLUE}}{\\mathbf{v}_2}^T \\cdot \\mathbf{x}' = v_{2x}x' + v_{2y}y' + v_{2z}z'`,
+            `\\textcolor{${BLUE}}{\\mathbf{p_{pc2}}} = \\textcolor{${BLUE}}{\\mathbf{v}_2}^T \\cdot \\mathbf{p}' = v_{2x}x' + v_{2y}y' + v_{2z}z'`,
             { throwOnError: false, displayMode: true }
           ) }} />
         </div>
         <div style={{ fontSize: 15, color: "var(--text-muted)", marginTop: 6, fontFamily: "system-ui" }}>
-          <InlineMath>{"\\mathbf{x}'"}</InlineMath> = centered point &nbsp;·&nbsp;
+          <InlineMath>{"\\mathbf{p}'"}</InlineMath> = centered point &nbsp;·&nbsp;
           <InlineMath>{`\\textcolor{${GOLD}}{\\mathbf{v}_1}`}</InlineMath>, <InlineMath>{`\\textcolor{${BLUE}}{\\mathbf{v}_2}`}</InlineMath> = first two eigenvectors (rows of projection matrix)
         </div>
       </div>
@@ -953,14 +979,14 @@ function StepReduction({ pca, centeredPts, projPts, isDark }) {
         <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "10px 12px" }}>
           <div style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 6 }}>3D centered data (drag to rotate)</div>
           <div style={{ height: 320 }}>
-            <Scatter3D pts={centeredPts} isDark={isDark} eigenvectors={pca.eigenvectors} showAxes={true} />
+            <Scatter3D pts={centeredPts} isDark={isDark} eigenvectors={pca.eigenvectors} showAxes={true} highlightIdx={pickedIdx} />
           </div>
         </div>
         <div style={{ textAlign: "center", color: "var(--text-muted)", fontSize: 24 }}>→</div>
         <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "10px 12px" }}>
           <div style={{ fontSize: 14, color: "var(--text-muted)", marginBottom: 6 }}>2D projection (PC1 × PC2)</div>
           <div style={{ height: 320 }}>
-            <Scatter2D projPts={projPts} isDark={isDark} />
+            <Scatter2D projPts={projPts} isDark={isDark} highlightIdx={pickedIdx} />
           </div>
         </div>
       </div>
@@ -978,6 +1004,124 @@ function StepReduction({ pca, centeredPts, projPts, isDark }) {
         In real datasets with hundreds of dimensions, PCA can often retain 80–95% of variance
         in just dozens of components.
       </Callout>
+
+      <Divider />
+
+      {/* ── TRACE A POINT ── */}
+      {(() => {
+        const n   = centeredPts.length;
+        const cp  = centeredPts[pickedIdx];
+        const v1  = eigenvectors[0], v2 = eigenvectors[1];
+        const pc1 = v1[0]*cp.x + v1[1]*cp.y + v1[2]*cp.z;
+        const pc2 = v2[0]*cp.x + v2[1]*cp.y + v2[2]*cp.z;
+        const ox  = cp.x + mean3[0], oy = cp.y + mean3[1], oz = cp.z + mean3[2];
+
+        const row = (label, content) => (
+          <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: "0.5rem", alignItems: "start", padding: "10px 0", borderBottom: "0.5px solid var(--border)" }}>
+            <div style={{ fontSize: 15, color: "var(--text-muted)", fontWeight: 500, paddingTop: 2 }}>{label}</div>
+            <div style={{ fontSize: 15, lineHeight: 1.75 }}>{content}</div>
+          </div>
+        );
+
+        const term = (coef, coord, val, color) => (
+          <span>
+            <span style={{ color }}>{coef.toFixed(4)}</span>
+            <span> * </span>
+            <span>{coord}</span>
+            <span>({val.toFixed(4)})</span>
+          </span>
+        );
+
+        return (
+          <div>
+            <h3 style={{ marginBottom: "0.75rem" }}>Trace a point</h3>
+            <p style={{ fontSize: 15, color: "var(--text-secondary)", marginBottom: "1rem", lineHeight: 1.7 }}>
+              Pick any point and see the full numeric walkthrough — original coordinates → center → project onto PC1 and PC2.<br />
+              Recall&nbsp;
+              <span style={{ fontSize: 15 }}>
+                <span style={{ color: GOLD }}>PC1 = [{v1.map(x => x.toFixed(4)).join(", ")}]</span>
+                ,&ensp;
+                <span style={{ color: BLUE }}>PC2 = [{v2.map(x => x.toFixed(4)).join(", ")}]</span>
+              </span>
+            </p>
+
+            {/* Slider */}
+            <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: "1.25rem" }}>
+              <span style={{ fontSize: 14, color: "var(--text-muted)", whiteSpace: "nowrap" }}>Point #</span>
+              <input
+                type="range" min={0} max={n - 1} value={pickedIdx}
+                onChange={e => setPickedIdx(Number(e.target.value))}
+                style={{ flex: 1 }}
+              />
+              <span style={{
+                fontSize: 13, fontWeight: 600, color: "#ff3bff",
+                minWidth: 40, textAlign: "right",
+              }}>
+                {pickedIdx}
+              </span>
+              <div style={{ display: "flex", gap: 4 }}>
+                <button style={{ padding: "3px 10px", fontSize: 14 }} onClick={() => setPickedIdx(i => Math.max(0, i - 1))}>−</button>
+                <button style={{ padding: "3px 10px", fontSize: 14 }} onClick={() => setPickedIdx(i => Math.min(n - 1, i + 1))}>+</button>
+              </div>
+            </div>
+
+            {/* Walkthrough table */}
+            <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "0.75rem 1.25rem", marginBottom: "1rem" }}>
+              {row(
+                "1. Original point",
+                <span>
+                  x = <strong>{ox.toFixed(4)}</strong>,&ensp;
+                  y = <strong>{oy.toFixed(4)}</strong>,&ensp;
+                  z = <strong>{oz.toFixed(4)}</strong>
+                </span>
+              )}
+              {row(
+                "2. Subtract mean",
+                <span>
+                  <InlineMath>{`\\mathbf{p}' = \\mathbf{p} - \\bar{\\mathbf{p}}`}</InlineMath>
+                  <span style={{ marginLeft: 10 }}>
+                    = (<strong>{cp.x.toFixed(4)}</strong>,&ensp;
+                    <strong>{cp.y.toFixed(4)}</strong>,&ensp;
+                    <strong>{cp.z.toFixed(4)}</strong>)
+                  </span>
+                </span>
+              )}
+              {row(
+                "3. Dot with v₁ (PC1)",
+                <span>
+                  {term(v1[0], null, cp.x, GOLD)}
+                  <span style={{ color: "var(--text-muted)" }}> + </span>
+                  {term(v1[1], null, cp.y, GOLD)}
+                  <span style={{ color: "var(--text-muted)" }}> + </span>
+                  {term(v1[2], null, cp.z, GOLD)}
+                  <span style={{ color: "var(--text-muted)" }}> = </span>
+                  <strong style={{ color: GOLD }}>{pc1.toFixed(4)}</strong>
+                </span>
+              )}
+              {row(
+                "4. Dot with v₂ (PC2)",
+                <span>
+                  {term(v2[0], null, cp.x, BLUE)}
+                  <span style={{ color: "var(--text-muted)" }}> + </span>
+                  {term(v2[1], null, cp.y, BLUE)}
+                  <span style={{ color: "var(--text-muted)" }}> + </span>
+                  {term(v2[2], null, cp.z, BLUE)}
+                  <span style={{ color: "var(--text-muted)" }}> = </span>
+                  <strong style={{ color: BLUE }}>{pc2.toFixed(4)}</strong>
+                </span>
+              )}
+              <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: "0.5rem", alignItems: "center", padding: "10px 0" }}>
+                <div style={{ fontSize: 15, color: "var(--text-muted)", fontWeight: 500 }}>5. Final 2D point</div>
+                <span style={{ fontSize: 15 }}>
+                  PC1 = <strong style={{ color: GOLD }}>{pc1.toFixed(4)}</strong>,&ensp;
+                  PC2 = <strong style={{ color: BLUE }}>{pc2.toFixed(4)}</strong>
+                  <span style={{ marginLeft: 12, color: "#ff3bff", fontSize: 15 }}> <i>(highlighted in both plots above)</i></span>
+                </span>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <br />
       <Callout borderColor={BLUE} bg={isDark ? "rgba(79,140,255,0.08)" : "rgba(79,140,255,0.06)"}>

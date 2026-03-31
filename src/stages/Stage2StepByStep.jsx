@@ -104,7 +104,7 @@ function Scatter3D({ pts, isDark, eigenvectors, showAxes, showMean, highlightIdx
       const my = mean(pts.map(p => p.y));
       const mz = mean(pts.map(p => p.z));
       const { sx, sy } = proj(mx, my, mz);
-      ctx.strokeStyle = RED; ctx.lineWidth = 2;
+      ctx.strokeStyle = BLUE; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(sx - 9, sy); ctx.lineTo(sx + 9, sy); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(sx, sy - 9); ctx.lineTo(sx, sy + 9); ctx.stroke();
       ctx.fillStyle = BLUE; ctx.font = "bold 10px system-ui"; ctx.textAlign = "left";
@@ -243,26 +243,6 @@ function Scatter2D({ projPts, isDark, highlightIdx }) {
 
 // ─── MATRIX DISPLAY ──────────────────────────────────────────────────────────
 
-function MatrixDisplay({ rows, label, color = "var(--text-primary)", size = 15 }) {
-  return (
-    <div style={{ display: "inline-flex", alignItems: "center", gap: 8, fontFamily: "monospace" }}>
-      {label && <span style={{ fontSize: size, color: "var(--text-muted)", marginRight: 4 }}>{label} =</span>}
-      <span style={{ fontSize: size + 4, color: "var(--text-muted)", lineHeight: 1 }}>[</span>
-      <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        {rows.map((row, i) => (
-          <div key={i} style={{ display: "flex", gap: 12 }}>
-            {row.map((v, j) => (
-              <span key={j} style={{ fontSize: size, color, minWidth: 56, textAlign: "right", fontWeight: 500 }}>
-                {typeof v === "number" ? v.toFixed(3) : v}
-              </span>
-            ))}
-          </div>
-        ))}
-      </div>
-      <span style={{ fontSize: size + 4, color: "var(--text-muted)", lineHeight: 1 }}>]</span>
-    </div>
-  );
-}
 
 // ─── STEP BAR ────────────────────────────────────────────────────────────────
 
@@ -570,7 +550,7 @@ function StepMean({ pts, pca, centered, setCentered, centeredPts, isDark }) {
         This is called <strong>mean centering</strong>.
       </p>
 
-      <Callout borderColor={RED} bg={isDark ? "rgba(232,93,36,0.08)" : "rgba(232,93,36,0.06)"}>
+      <Callout borderColor={BLUE} bg={isDark ? "rgba(27, 182, 238, 0.08)" : "rgba(36, 180, 232, 0.06)"}>
         <strong>Why does it matter?</strong> PCA computes directions through the <em>origin</em>.
         If the data is not centered, the first "principal component" will point toward the
         mean of the data rather than the direction of maximum variance — giving completely
@@ -584,13 +564,13 @@ function StepMean({ pts, pca, centered, setCentered, centeredPts, isDark }) {
         {/* Formula */}
         <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "1rem 1.25rem" }}>
           <div style={{ fontSize: 15, color: "var(--text-muted)", marginBottom: 10 }}>Formula:</div>
-          <MathBlock latex={`\\textcolor{${RED}}{\\bar{p}} = \\frac{1}{N}\\sum_{i=1}^{N} p_i`} />
+          <MathBlock latex={`\\textcolor{${BLUE}}{\\bar{p}} = \\frac{1}{N}\\sum_{i=1}^{N} p_i`} />
           <div style={{ fontSize: 15, color: "var(--text-secondary)", lineHeight: 1.7, marginTop: 8 }}>
             For each dimension, sum all N = {n} values and divide by N.
-            The mean vector <InlineMath>{`\\textcolor{${RED}}{\\bar{p}}`}</InlineMath> is then subtracted
+            The mean vector <InlineMath>{`\\textcolor{${BLUE}}{\\bar{p}}`}</InlineMath> is then subtracted
             from every point:
           </div>
-          <MathBlock latex={`p_i' = p_i - \\textcolor{${RED}}{\\bar{p}}`} />
+          <MathBlock latex={`p_i' = p_i - \\textcolor{${BLUE}}{\\bar{p}}`} />
         </div>
 
         {/* Computed values */}
@@ -602,7 +582,7 @@ function StepMean({ pts, pca, centered, setCentered, centeredPts, isDark }) {
               [<InlineMath>{"\\bar{z}"}</InlineMath>, mz]].map(([label, val]) => (
               <div key={label} style={{ textAlign: "center" }}>
                 <div style={{ fontSize: 15, color: "var(--text-muted)" }}>{label}</div>
-                <div style={{ fontSize: 22, fontWeight: 500, color: RED }}>{val.toFixed(3)}</div>
+                <div style={{ fontSize: 22, fontWeight: 500, color: BLUE }}>{val.toFixed(3)}</div>
               </div>
             ))}
           </div>
@@ -649,7 +629,7 @@ function StepMean({ pts, pca, centered, setCentered, centeredPts, isDark }) {
               <br />
               <div style={{ fontSize: 15, color: "var(--text-muted)", marginBottom: 8 }}>New means (should be ≈ 0):</div>
               <div style={{ display: "flex", gap: 16 }}>
-                {[["x̄′", mean(centeredPts.map(p => p.x))], ["ȳ′", mean(centeredPts.map(p => p.y))], ["z̄′", mean(centeredPts.map(p => p.z))]].map(([l, v]) => (
+                {[[<InlineMath>{`\\bar{x}'`}</InlineMath>, mean(centeredPts.map(p => p.x))], [<InlineMath>{`\\bar{y}'`}</InlineMath>, mean(centeredPts.map(p => p.y))], [<InlineMath>{`\\bar{z}'`}</InlineMath>, mean(centeredPts.map(p => p.z))]].map(([l, v]) => (
                   <div key={l} style={{ textAlign: "center" }}>
                     <div style={{ fontSize: 15, color: "var(--text-muted)" }}>{l}</div>
                     <div style={{ fontSize: 22, fontWeight: 500, color: GREEN }}>{Math.abs(v) < 1e-10 ? "0.000" : v.toFixed(3)}</div>
@@ -659,8 +639,8 @@ function StepMean({ pts, pca, centered, setCentered, centeredPts, isDark }) {
             </>
           ) : (
             <>
-              <Callout borderColor={RED} bg={isDark ? "rgba(232,93,36,0.08)" : "rgba(232,93,36,0.06)"}>
-                The red cross marks the mean. It is far from (0, 0, 0).
+              <Callout borderColor={BLUE} bg={isDark ? "rgba(27, 182, 238, 0.08)" : "rgba(36, 180, 232, 0.06)"}>
+                The blue cross marks the mean. It is far from (0, 0, 0).
                 If PCA runs now, the first component will point toward this offset
                 rather than the direction of maximum spread.
               </Callout>
@@ -736,6 +716,8 @@ function StepCovariance({ pca, centeredPts, isDark }) {
         For our 3D data, <strong>C</strong> is a symmetric 3×3 matrix:
       </p>
 
+      <MathBlock latex={String.raw`C = \begin{pmatrix} \textcolor{${GOLD}}{\text{Var}(x)} & \textcolor{${BLUE}}{\text{Cov}(x,y)} & \textcolor{${BLUE}}{\text{Cov}(x,z)} \\ \textcolor{${BLUE}}{\text{Cov}(y,x)} & \textcolor{${GOLD}}{\text{Var}(y)} & \textcolor{${BLUE}}{\text{Cov}(y,z)} \\ \textcolor{${BLUE}}{\text{Cov}(z,x)} & \textcolor{${BLUE}}{\text{Cov}(z,y)} & \textcolor{${GOLD}}{\text{Var}(z)} \end{pmatrix}`} />
+
       {/* Properties */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: "1rem" }}>
         {[
@@ -761,26 +743,25 @@ function StepCovariance({ pca, centeredPts, isDark }) {
             <div style={{ fontSize: 15, color: "var(--text-muted)", marginBottom: 12 }}>
               Computed covariance matrix C (N = {n} centered points):
             </div>
-            <div style={{ overflowX: "auto" }}>
-              <MatrixDisplay rows={C.map(row => row)} label="C" color="var(--text-primary)" />
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: 15, color: "var(--text-muted)", marginBottom: 6 }}>Diagonal (variances):</div>
-            {["Var(x)", "Var(y)", "Var(z)"].map((l, i) => (
-              <div key={i} style={{ fontSize: 15, marginBottom: 4 }}>
-                <span style={{ color: "var(--text-muted)" }}>{l} = </span>
-                <strong style={{ color: GOLD }}>{C[i][i].toFixed(4)}</strong>
-              </div>
-            ))}
+            <div style={{ overflowX: "auto" }} dangerouslySetInnerHTML={{ __html: katex.renderToString(
+              `\\textcolor{${GOLD}}{C} = \\begin{bmatrix} ${
+                C.map((row, i) => row.map((v, j) =>
+                  i === j
+                    ? `\\textcolor{${GOLD}}{${v.toFixed(2)}}`
+                    : `\\textcolor{${BLUE}}{${v.toFixed(2)}}`
+                ).join(" & ")).join(" \\\\ ")
+              } \\end{bmatrix}`,
+              { throwOnError: false, displayMode: true }
+            ) }} />
           </div>
         </div>
       </div>
 
       <Callout borderColor={BLUE} bg={isDark ? "rgba(79,140,255,0.08)" : "rgba(79,140,255,0.06)"}>
         <strong>Key insight:</strong> Large diagonal values mean that dimension has high spread.
-        Large off-diagonal values mean two dimensions are correlated — carrying redundant information.
-        PCA uses C to find directions that <em>decorrelate</em> the data.
+        Large off-diagonal absolute values mean two dimensions are correlated — carrying redundant information. <br /><br />
+        Because C is <span style={{ color: RED, fontWeight: 600 }}>symmetrical</span>, its eigenvectors are guaranteed to be{" "}
+        <span style={{ color: RED, fontWeight: 600 }}>orthogonal to each other</span> — they form a perfectly perpendicular coordinate system aligned with the data's natural axes.
       </Callout>
     </div>
   );
@@ -1019,7 +1000,7 @@ function StepReduction({ pca, centeredPts, projPts, isDark }) {
         const row = (label, content) => (
           <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: "0.5rem", alignItems: "start", padding: "10px 0", borderBottom: "0.5px solid var(--border)" }}>
             <div style={{ fontSize: 15, color: "var(--text-muted)", fontWeight: 500, paddingTop: 2 }}>{label}</div>
-            <div style={{ fontSize: 15, lineHeight: 1.75 }}>{content}</div>
+            <div className="trace-row-content" style={{ fontSize: 17, lineHeight: 1.75, fontFamily: "KaTeX_Main, serif" }}>{content}</div>
           </div>
         );
 
@@ -1034,11 +1015,12 @@ function StepReduction({ pca, centeredPts, projPts, isDark }) {
 
         return (
           <div>
+            <style>{`.trace-row-content .katex { font-size: 1em; }`}</style>
             <h3 style={{ marginBottom: "0.75rem" }}>Trace a point</h3>
             <p style={{ fontSize: 15, color: "var(--text-secondary)", marginBottom: "1rem", lineHeight: 1.7 }}>
               Pick any point and see the full numeric walkthrough — original coordinates → center → project onto PC1 and PC2.<br />
               Recall&nbsp;
-              <span style={{ fontSize: 15 }}>
+              <span style={{ fontSize: "1.21em", fontFamily: "KaTeX_Main, serif" }}>
                 <span style={{ color: GOLD }}>PC1 = [{v1.map(x => x.toFixed(4)).join(", ")}]</span>
                 ,&ensp;
                 <span style={{ color: BLUE }}>PC2 = [{v2.map(x => x.toFixed(4)).join(", ")}]</span>
@@ -1087,7 +1069,7 @@ function StepReduction({ pca, centeredPts, projPts, isDark }) {
                 </span>
               )}
               {row(
-                "3. Dot with v₁ (PC1)",
+                <>3. Dot with <InlineMath>{"\\mathbf{v}_1"}</InlineMath> (PC1)</>,
                 <span>
                   {term(v1[0], null, cp.x, GOLD)}
                   <span style={{ color: "var(--text-muted)" }}> + </span>
@@ -1099,7 +1081,7 @@ function StepReduction({ pca, centeredPts, projPts, isDark }) {
                 </span>
               )}
               {row(
-                "4. Dot with v₂ (PC2)",
+                <>4. Dot with <InlineMath>{"\\mathbf{v}_2"}</InlineMath> (PC2)</>,
                 <span>
                   {term(v2[0], null, cp.x, BLUE)}
                   <span style={{ color: "var(--text-muted)" }}> + </span>
@@ -1112,10 +1094,10 @@ function StepReduction({ pca, centeredPts, projPts, isDark }) {
               )}
               <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: "0.5rem", alignItems: "center", padding: "10px 0" }}>
                 <div style={{ fontSize: 15, color: "var(--text-muted)", fontWeight: 500 }}>5. Final 2D point</div>
-                <span style={{ fontSize: 15 }}>
-                  PC1 = <strong style={{ color: GOLD }}>{pc1.toFixed(4)}</strong>,&ensp;
-                  PC2 = <strong style={{ color: BLUE }}>{pc2.toFixed(4)}</strong>
-                  <span style={{ marginLeft: 12, color: "#ff3bff", fontSize: 15 }}> <i>(highlighted in both plots above)</i></span>
+                <span style={{ fontSize: 17 }}>
+                  <span style={{ fontFamily: "KaTeX_Main, serif"}}>PC1 = <strong style={{ color: GOLD }}>{pc1.toFixed(4)}</strong>,&ensp;</span>
+                  <span style={{ fontFamily: "KaTeX_Main, serif"}}>PC2 = <strong style={{ color: BLUE }}>{pc2.toFixed(4)}</strong></span>
+                  <span style={{ marginLeft: 12, color: "#ff3bff", fontSize: 15 }}> (highlighted in both plots above)</span>
                 </span>
               </div>
             </div>

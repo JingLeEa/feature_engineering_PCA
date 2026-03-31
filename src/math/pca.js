@@ -171,6 +171,52 @@ function jacobiEigen3(A) {
 }
 
 /** Project 3D {x,y,z} points onto the top-k eigenvectors */
+/**
+ * Jacobi eigendecomposition for a real N×N symmetric matrix.
+ * Returns { eigenvalues: number[], eigenvectors: number[][] }
+ * eigenvectors[i] is a length-N array (the i-th eigenvector).
+ */
+export function jacobiEigenN(A) {
+  const n = A.length;
+  let a = A.map((r) => [...r]);
+  let v = Array.from({ length: n }, (_, i) =>
+    Array.from({ length: n }, (_, j) => (i === j ? 1 : 0))
+  );
+  for (let iter = 0; iter < 100 * n * n; iter++) {
+    let p = 0, q = 1, max = 0;
+    for (let i = 0; i < n; i++)
+      for (let j = i + 1; j < n; j++)
+        if (Math.abs(a[i][j]) > max) { max = Math.abs(a[i][j]); p = i; q = j; }
+    if (max < 1e-12) break;
+    const theta = 0.5 * Math.atan2(2 * a[p][q], a[p][p] - a[q][q]);
+    const c = Math.cos(theta), s = Math.sin(theta);
+    const na = a.map((r) => [...r]);
+    for (let i = 0; i < n; i++) {
+      if (i !== p && i !== q) {
+        na[i][p] = na[p][i] =  c * a[i][p] + s * a[i][q];
+        na[i][q] = na[q][i] = -s * a[i][p] + c * a[i][q];
+      }
+    }
+    na[p][p] = c*c*a[p][p] + 2*s*c*a[p][q] + s*s*a[q][q];
+    na[q][q] = s*s*a[p][p] - 2*s*c*a[p][q] + c*c*a[q][q];
+    na[p][q] = na[q][p] = 0;
+    a = na;
+    const nv = v.map((r) => [...r]);
+    for (let i = 0; i < n; i++) {
+      nv[i][p] =  c * v[i][p] + s * v[i][q];
+      nv[i][q] = -s * v[i][p] + c * v[i][q];
+    }
+    v = nv;
+  }
+  return {
+    eigenvalues:  Array.from({ length: n }, (_, i) => a[i][i]),
+    // eigenvectors[i][j] = j-th component of the i-th eigenvector
+    eigenvectors: Array.from({ length: n }, (_, i) =>
+      Array.from({ length: n }, (_, j) => v[j][i])
+    ),
+  };
+}
+
 export function projectPoints3D(pts, eigenvectors, k = 2) {
   return pts.map((p) => {
     const coords = eigenvectors.slice(0, k).map(([vx, vy, vz]) =>

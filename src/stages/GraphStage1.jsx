@@ -54,7 +54,7 @@ function ptSegDist(px, py, ax, ay, bx, by) {
   return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
 }
 
-export default function GraphStage1({ isDark, graph, setGraph }) {
+export default function GraphStage1({ isDark, graph, setGraph, goToGraph2, goToPCA }) {
   const [selected, setSelected] = useState(null); // node id awaiting second click
   const canvasRef  = useRef(null);
   const dragging   = useRef(null);  // { id, ox, oy }
@@ -296,12 +296,12 @@ export default function GraphStage1({ isDark, graph, setGraph }) {
         // Properties table: [property, A value, D value, L value, which cols to highlight]
         const HIGHLIGHT = "rgba(255,200,0,0.13)";
         const props = [
-          { name: "Symmetric",          a: "Yes",                      d: "Yes",                       l: "Yes",                       hi: [] },
-          { name: "Diagonal",           a: "No",                       d: "Yes",                       l: "No",                        hi: [1] },
-          { name: "Row sums",           a: <InlineMath>{"d_i"}</InlineMath>, d: <InlineMath>{"d_i"}</InlineMath>, l: "0",            hi: [2] },
-          { name: "PSD",                a: "Not always",               d: "Yes",                       l: "Yes",                       hi: [0] },
-          { name: "Smallest eigenvalue",a: "can be < 0",               d: "0",                         l: "0",                         hi: [0] },
-          { name: "Largest eigenvalue", a: <><InlineMath>{"\\leq"}</InlineMath> {maxDeg}</>,            d: String(maxDeg),              l: <><InlineMath>{"\\leq"}</InlineMath> {2 * maxDeg}</>, hi: [0, 1, 2] },
+          { name: "Symmetric",              a: "Yes",                      d: "Yes",                       l: "Yes",                       hi: [] },
+          { name: "Diagonal",               a: "No",                       d: "Yes",                       l: "No",                        hi: [1] },
+          { name: "Row sums",               a: <InlineMath>{"d_i"}</InlineMath>, d: <InlineMath>{"d_i"}</InlineMath>, l: "0",            hi: [2] },
+          { name: "Positive semi-definite", a: "Not always",               d: "Yes",                       l: "Yes",                       hi: [0] },
+          { name: "Smallest eigenvalue",    a: "can be < 0",               d: "0",                         l: "0",                         hi: [0] },
+          { name: "Largest eigenvalue",     a: <><InlineMath>{"\\leq"}</InlineMath> {maxDeg}</>,            d: String(maxDeg),              l: <><InlineMath>{"\\leq"}</InlineMath> {2 * maxDeg}</>, hi: [0, 1, 2] },
         ];
 
         return (
@@ -358,6 +358,16 @@ export default function GraphStage1({ isDark, graph, setGraph }) {
           </div>
         );
       })()}
+
+      {/* Navigation */}
+      <div style={{ display: "flex", justifyContent: "space-between", marginTop: "2rem" }}>
+        <button onClick={goToPCA} style={{ fontSize: 14, padding: "8px 18px" }}>
+          ← Back to PCA
+        </button>
+        <button className="btn-primary" onClick={goToGraph2} style={{ fontSize: 14, padding: "8px 18px" }}>
+          Next: Spectral Clustering →
+        </button>
+      </div>
     </div>
   );
 }

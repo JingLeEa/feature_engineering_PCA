@@ -289,7 +289,7 @@ const STEP_LABELS = [
   "Dimension reduction",
 ];
 
-export default function Stage2StepByStep({ isDark, goToStage1 }) {
+export default function Stage2StepByStep({ isDark, goToStage1, goToGraph1 }) {
   const [shapeKey, setShapeKey] = useState(null);
   const [step, setStep]         = useState(0);
   const [centered, setCentered] = useState(false);
@@ -313,7 +313,7 @@ export default function Stage2StepByStep({ isDark, goToStage1 }) {
   }
 
   if (showSummary) {
-    return <SummarySection pca={pca} centeredPts={centeredPts} onBackToShapes={() => { setShapeKey(null); setShowSummary(false); }} isDark={isDark} />;
+    return <SummarySection pca={pca} centeredPts={centeredPts} onBackToShapes={() => { setShapeKey(null); setShowSummary(false); }} goToGraph1={goToGraph1} isDark={isDark} />;
   }
 
   const n = pts.length;
@@ -396,7 +396,8 @@ export default function Stage2StepByStep({ isDark, goToStage1 }) {
         {step === 3 ? (
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={() => setShapeKey(null)}>Choose another shape</button>
-            <button className="btn-primary" onClick={() => setShowSummary(true)}>View Summary →</button>
+            <button onClick={() => setShowSummary(true)}>View Summary</button>
+            <button className="btn-primary" onClick={goToGraph1}>Next: Graph Lab →</button>
           </div>
         ) : (
           <button className="btn-primary" onClick={() => setStep(s => s + 1)}>
@@ -410,7 +411,7 @@ export default function Stage2StepByStep({ isDark, goToStage1 }) {
 
 // ─── SUMMARY ──────────────────────────────────────────────────────────────────
 
-function SummarySection({ pca, centeredPts, onBackToShapes, isDark }) {
+function SummarySection({ pca, centeredPts, onBackToShapes, goToGraph1, isDark }) {
   const keptPct = pca ? ((pca.eigenvalues[0] + pca.eigenvalues[1]) / pca.totalVar * 100).toFixed(1) : "—";
 
   return (
@@ -483,7 +484,10 @@ function SummarySection({ pca, centeredPts, onBackToShapes, isDark }) {
       )}
 
       <Divider />
-      <button onClick={onBackToShapes}>← Back to Shapes</button>
+      <div style={{ display: "flex", justifyContent: "space-between" }}>
+        <button onClick={onBackToShapes}>← Back to Shapes</button>
+        <button className="btn-primary" onClick={goToGraph1}>Next: Graph Lab →</button>
+      </div>
     </div>
   );
 }

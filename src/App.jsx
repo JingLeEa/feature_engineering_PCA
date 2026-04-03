@@ -77,10 +77,10 @@ export default function App() {
 
       {/* Page content */}
       {page === "stage1" && <Stage1Intuition isDark={isDark} goToStage2={() => setPage("stage2")} />}
-      {page === "stage2" && <Stage2StepByStep isDark={isDark} goToStage1={() => setPage("stage1")} />}
-      {page === "graph1" && <GraphStage1 isDark={isDark} graph={graphState} setGraph={setGraphState} />}
-      {page === "graph2" && <GraphStage2 isDark={isDark} graph={graphState} />}
-      {page === "graph3" && <GraphStage3 isDark={isDark} />}
+      {page === "stage2" && <Stage2StepByStep isDark={isDark} goToStage1={() => setPage("stage1")} goToGraph1={() => setPage("graph1")} />}
+      {page === "graph1" && <GraphStage1 isDark={isDark} graph={graphState} setGraph={setGraphState} goToGraph2={() => setPage("graph2")} goToPCA={() => setPage("stage1")} />}
+      {page === "graph2" && <GraphStage2 isDark={isDark} graph={graphState} goToGraph1={() => setPage("graph1")} goToGraph3={() => setPage("graph3")} />}
+      {page === "graph3" && <GraphStage3 isDark={isDark} graph={graphState} goToGraph1={() => setPage("graph1")} goToGraph2={() => setPage("graph2")} />}
     </>
   );
 }

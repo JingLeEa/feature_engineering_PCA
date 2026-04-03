@@ -330,7 +330,7 @@ export default function GraphStage3({ isDark, graph, goToGraph1, goToGraph2 }) {
             : "Select a node first"}
         </span>
         {sourceIdx !== null && (
-          <button onClick={reset} style={{ marginLeft: "auto", fontSize: 13, padding: "5px 14px" }}>
+          <button onClick={reset} style={{ marginLeft: "auto", fontSize: 14, padding: "8px 14px" }}>
             Reset
           </button>
         )}
@@ -338,14 +338,14 @@ export default function GraphStage3({ isDark, graph, goToGraph1, goToGraph2 }) {
 
       {/* Legend */}
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: "1.5rem", alignItems: "center" }}>
-        <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>Colour scale:</span>
+        <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>Colour scale:</span>
         {/* Gradient swatch */}
         <span style={{
           display: "inline-block", width: 80, height: 12, borderRadius: 3,
           background: "linear-gradient(to right, #c0392b, #f1c40f, #27ae60)",
         }} />
-        <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>source (red) → mid (yellow) → furthest (green)</span>
-        <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--text-secondary)" }}>
+        <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>source (red) → mid (yellow) → furthest (green)</span>
+        <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, color: "var(--text-secondary)" }}>
           <span style={{ display: "inline-block", width: 12, height: 12, background: GREY, borderRadius: 3 }} />
           Uninfected
         </span>
@@ -360,19 +360,54 @@ export default function GraphStage3({ isDark, graph, goToGraph1, goToGraph2 }) {
           <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>
             Influence vector{" "}
             <InlineMath>
-              {"\\mathbf{x} = L^{" + step + "} \\cdot \\mathbf{e}_{" + (graph.nodes[sourceIdx]?.id ?? "") + "}"}
+              {"\\mathbf{x}_{" + step + "} = L^{" + step + "} \\cdot \\mathbf{e}_{" + (graph.nodes[sourceIdx]?.id ?? "") + "}"}
             </InlineMath>
           </div>
-          <div style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 10 }}>
+          <div style={{ fontSize: 15, color: "var(--text-secondary)", marginBottom: 8 }}>
+            <InlineMath>{"\\mathbf{e}_i"}</InlineMath> represents the initial state of the system where only node <InlineMath>{"i"}</InlineMath> is "active".{" "}
             A non-zero value in <InlineMath>{"\\mathbf{x}[i]"}</InlineMath> means node <InlineMath>{"i"}</InlineMath> has been reached by the spread.
           </div>
+
+          {/* Initial e-vector display */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
+            fontFamily: "KaTeX_Main, serif", fontSize: 15,
+            background: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)",
+            border: "0.5px solid var(--border)", borderRadius: 8,
+            padding: "8px 14px", marginBottom: 12,
+          }}>
+            <span style={{ color: "var(--text-muted)", marginRight: 4 }}>
+              <InlineMath>{"\\mathbf{e}_{" + (graph.nodes[sourceIdx]?.id ?? "") + "} ="}</InlineMath>
+            </span>
+            <span style={{ color: "var(--text-muted)" }}>[</span>
+            {graph.nodes.map(({ id }, ni) => {
+              const isOne = ni === sourceIdx;
+              return (
+                <span key={id} style={{ display: "inline-flex", alignItems: "center" }}>
+                  <span style={{
+                    color: isOne ? "#c0392b" : "var(--text-muted)",
+                    fontWeight: isOne ? 700 : 400,
+                    background: isOne ? (isDark ? "rgba(251,157,7,0.15)" : "rgba(251,157,7,0.12)") : "transparent",
+                    borderRadius: 3, padding: isOne ? "0 3px" : "0",
+                  }}>
+                    {isOne ? "1" : "0"}
+                  </span>
+                  {ni < graph.nodes.length - 1 && (
+                    <span style={{ color: "var(--text-muted)", marginLeft: 2, marginRight: 2 }}>,</span>
+                  )}
+                </span>
+              );
+            })}
+            <span style={{ color: "var(--text-muted)" }}>]</span>
+            <span style={{ color: "var(--text-muted)", fontSize: 16, lineHeight: 1, alignSelf: "flex-end", marginBottom: -2 }}><InlineMath>^T</InlineMath></span>
+          </div>
           <div style={{ overflowX: "auto" }}>
-            <table style={{ borderCollapse: "collapse", fontSize: 13, width: "100%" }}>
+            <table style={{ borderCollapse: "collapse", fontSize: 14, width: "100%" }}>
               <thead>
                 <tr>
                   {[
                     { label: "Node",    align: "center" },
-                    { label: <InlineMath>{"\\mathbf{x}[i]"}</InlineMath>, align: "left" },
+                    { label: <InlineMath>{"\\mathbf{x}_k[i]"}</InlineMath>, align: "left" },
                     { label: "Steps from source", align: "left" },
                     { label: "Status",  align: "left" },
                   ].map(({ label, align }, i) => (
@@ -400,7 +435,7 @@ export default function GraphStage3({ isDark, graph, goToGraph1, goToGraph2 }) {
                   return (
                     <tr key={id} style={{ background: bg, borderBottom: "0.5px solid var(--border)" }}>
                       <td style={{ padding: "6px 10px", textAlign: "center", fontWeight: 600 }}>{id}</td>
-                      <td style={{ padding: "6px 10px", fontFamily: "monospace" }}>
+                      <td style={{ padding: "6px 10px" }}>
                         {vec[ni].toFixed(6)}
                       </td>
                       <td style={{ padding: "6px 10px", textAlign: "center", color: "var(--text-secondary)" }}>

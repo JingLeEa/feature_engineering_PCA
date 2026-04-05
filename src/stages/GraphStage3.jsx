@@ -1,9 +1,29 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
+import { jacobiEigenN } from "../math/pca.js";
+import { Callout } from "../components/ui/primitives.jsx";
+
+const GOLD = "#fb9d07";
+const RED  = "#E85D24";
 
 function InlineMath({ children }) {
   return <span dangerouslySetInnerHTML={{ __html: katex.renderToString(children, { throwOnError: false }) }} />;
+}
+
+function MathBlock({ label, latex }) {
+  const html = katex.renderToString(latex, { throwOnError: false, displayMode: true });
+  return (
+    <div style={{
+      background: "var(--metric-bg)", border: "0.5px solid var(--border)",
+      borderRadius: 10, padding: "10px 16px", margin: "8px 0",
+      fontSize: 16, lineHeight: 1.8, color: "var(--text-primary)",
+      overflowX: "auto", textAlign: "center",
+    }}>
+      {label && <div style={{ fontSize: 14, color: "var(--text-muted)", fontFamily: "system-ui", marginBottom: 4, textAlign: "left" }}>{label}</div>}
+      <div dangerouslySetInnerHTML={{ __html: html }} />
+    </div>
+  );
 }
 
 const N              = 10;
@@ -82,6 +102,12 @@ export default function GraphStage3({ isDark, graph, goToGraph1, goToGraph2 }) {
   const canvasRef = useRef(null);
 
   const L = useMemo(() => buildLaplacian(graph.edges), [graph.edges]);
+
+  // Sorted eigenvalues of L (ascending, clamped ≥ 0)
+  const eigenvalues = useMemo(() => {
+    const { eigenvalues: raw } = jacobiEigenN(L);
+    return [...raw].sort((a, b) => a - b).map(v => Math.max(0, v));
+  }, [L]);
 
   // BFS distances from source
   const distances = useMemo(
@@ -242,10 +268,10 @@ export default function GraphStage3({ isDark, graph, goToGraph1, goToGraph2 }) {
 
       <h1 style={{ marginBottom: "0.4rem" }}>Infection Spread</h1>
       <p style={{ marginBottom: "1.25rem", color: "var(--text-secondary)" }}>
-        Select a starting node to infect it. At each step the influence vector{" "}
-        <InlineMath>{"\\mathbf{x}"}</InlineMath> is multiplied by the graph Laplacian:{" "}
-        <InlineMath>{"\\mathbf{x} \\leftarrow L \\cdot \\mathbf{x}"}</InlineMath>.
-        Nodes with a non-zero component are considered reached by the spread.
+        Select a starting node to infect it. At each step k, the state vector is computed as{" "}
+        <InlineMath>{"\\mathbf{x_k} = L^k \\cdot \\mathbf{x_0}"}</InlineMath> where{" "}
+        <InlineMath>{"\\mathbf{x_0}"}</InlineMath> is the initial vector with 1 at the source node and 0 everywhere else. 
+        Nodes with a non-zero component in <InlineMath>{"\\mathbf{x_k}"}</InlineMath> are considered reached by the spread. 
         The colour fades from deep red (source) to green (further away).
       </p>
 
@@ -360,12 +386,12 @@ export default function GraphStage3({ isDark, graph, goToGraph1, goToGraph2 }) {
           <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>
             Influence vector{" "}
             <InlineMath>
-              {"\\mathbf{x}_{" + step + "} = L^{" + step + "} \\cdot \\mathbf{e}_{" + (graph.nodes[sourceIdx]?.id ?? "") + "}"}
+              {"\\mathbf{x}_{" + step + "} = L^{" + step + "} \\cdot \\mathbf{x}_0"}
             </InlineMath>
           </div>
           <div style={{ fontSize: 15, color: "var(--text-secondary)", marginBottom: 8 }}>
-            <InlineMath>{"\\mathbf{e}_i"}</InlineMath> represents the initial state of the system where only node <InlineMath>{"i"}</InlineMath> is "active".{" "}
-            A non-zero value in <InlineMath>{"\\mathbf{x}[i]"}</InlineMath> means node <InlineMath>{"i"}</InlineMath> has been reached by the spread.
+            <InlineMath>{"\\mathbf{x}_0"}</InlineMath> represents the initial state of the system where only the source node is "active".{" "}
+            A non-zero value in <InlineMath>{"\\mathbf{x}_k[i]"}</InlineMath> means node <InlineMath>{"i"}</InlineMath> has been reached by the spread.
           </div>
 
           {/* Initial e-vector display */}
@@ -377,7 +403,7 @@ export default function GraphStage3({ isDark, graph, goToGraph1, goToGraph2 }) {
             padding: "8px 14px", marginBottom: 12,
           }}>
             <span style={{ color: "var(--text-muted)", marginRight: 4 }}>
-              <InlineMath>{"\\mathbf{e}_{" + (graph.nodes[sourceIdx]?.id ?? "") + "} ="}</InlineMath>
+              <InlineMath>{"\\mathbf{x}_0 ="}</InlineMath>
             </span>
             <span style={{ color: "var(--text-muted)" }}>[</span>
             {graph.nodes.map(({ id }, ni) => {
@@ -452,6 +478,281 @@ export default function GraphStage3({ isDark, graph, goToGraph1, goToGraph2 }) {
           </div>
         </div>
       )}
+      
+      {/* ── Section 1: Observation callout ── */}
+      <Callout borderColor={GOLD} bg={isDark ? "rgba(251,157,7,0.08)" : "rgba(251,157,7,0.06)"}>
+        You just watched{" "}
+        <InlineMath>{"\\mathbf{x}_k = L^k \\cdot \\mathbf{x}_0"}</InlineMath>
+        {" "}computed step by step — each step multiplies the current state by{" "}
+        <InlineMath>{"L"}</InlineMath>. This works fine for 10 nodes.
+        But what if the graph had <strong>1 million nodes</strong>?
+      </Callout>
+
+      {/* ── Section 2: The problem with the naive approach ── */}
+      <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "1.25rem 1.5rem", marginTop: "1rem", marginBottom: "1rem" }}>
+        <h3 style={{ marginBottom: "0.5rem", marginTop: 0 }}>The problem with the naive approach</h3>
+        <p style={{ color: "var(--text-secondary)", fontSize: 14, marginBottom: "0.75rem" }}>
+          Computing <InlineMath>{"L^k"}</InlineMath> directly requires{" "}
+          <InlineMath>{"k"}</InlineMath> matrix multiplications. Each multiplication of two{" "}
+          <InlineMath>{"N \\times N"}</InlineMath> matrices costs{" "}
+          <InlineMath>{"O(N^3)"}</InlineMath> operations.
+        </p>
+        <div style={{ overflowX: "auto", marginBottom: "0.75rem" }}>
+          <table style={{ borderCollapse: "collapse", fontSize: 14, minWidth: 320 }}>
+            <thead>
+              <tr>
+                {["Graph size", "Operations per step"].map(h => (
+                  <th key={h} style={{ padding: "6px 16px", borderBottom: "0.5px solid var(--border)", color: "var(--text-muted)", fontWeight: 600, textAlign: "left" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                ["10 nodes",        <InlineMath key="a">{"1{,}000"}</InlineMath>],
+                ["1,000 nodes",     <InlineMath key="b">{"1{,}000{,}000{,}000"}</InlineMath>],
+                ["1,000,000 nodes", <InlineMath key="c">{"10^{18}"}</InlineMath>],
+              ].map(([size, ops]) => (
+                <tr key={size} style={{ borderBottom: "0.5px solid var(--border)" }}>
+                  <td style={{ padding: "7px 16px", fontFamily: "monospace", fontSize: 13 }}>{size}</td>
+                  <td style={{ padding: "7px 16px" }}>{ops}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p style={{ color: "var(--text-muted)", fontSize: 14, margin: 0 }}>We need a smarter way.</p>
+      </div>
+
+      {/* ── Section 3: Key observation ── */}
+      <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "1.25rem 1.5rem", marginBottom: "1rem" }}>
+        <h3 style={{ marginBottom: "0.5rem", marginTop: 0 }}>Key observation: <InlineMath>{"L"}</InlineMath> is symmetric</h3>
+        <p style={{ color: "var(--text-secondary)", fontSize: 14, marginBottom: "0.5rem" }}>
+          Since <InlineMath>{"L = D - A"}</InlineMath> is symmetric, its eigenvectors are <strong>orthonormal</strong> (orthogonal + unit length):
+        </p>
+        <MathBlock latex={"V^T V = I \\iff V V^T = I"} />
+        <p style={{ color: "var(--text-secondary)", fontSize: 14, margin: "0.5rem 0" }}>
+          Given <InlineMath>{"LV = V\\Lambda"}</InlineMath>:
+        </p>
+        <MathBlock latex={
+          "LVV^T = V\\Lambda V^T \\\\" +
+          "L = V\\Lambda V^T"
+        } />
+      </div>
+
+      {/* ── Section 4: Raising L to the k-th power ── */}
+      <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "1.25rem 1.5rem", marginBottom: "1.5rem" }}>
+        <h3 style={{ marginBottom: "0.5rem", marginTop: 0 }}>Raising <InlineMath>{"L"}</InlineMath> to the <InlineMath>{"k"}</InlineMath>-th power</h3>
+        <p style={{ color: "var(--text-secondary)", fontSize: 14, marginBottom: "0.5rem" }}>
+          When we square <InlineMath>{"L"}</InlineMath>:
+        </p>
+        <MathBlock latex={
+          "L^2 = V\\Lambda V^T \\cdot V\\Lambda V^T \\\\" +
+          "= V\\Lambda (V^T V) \\Lambda V^T \\\\" +
+          "= V\\Lambda \\cdot I \\cdot \\Lambda V^T \\\\" +
+          "= V\\Lambda^2 V^T"
+        } />
+        {/* Highlighted result */}
+        <div style={{
+          background: "var(--metric-bg)", border: `1.5px solid ${GOLD}`,
+          borderRadius: 10, padding: "10px 16px", margin: "10px 0",
+          overflowX: "auto", textAlign: "center",
+        }}>
+          <div dangerouslySetInnerHTML={{ __html: katex.renderToString("L^k = V\\Lambda^k V^T", { throwOnError: false, displayMode: true }) }} />
+        </div>
+        <p style={{ color: "var(--text-secondary)", fontSize: 14, margin: "0.75rem 0 0.5rem" }}>
+          And since <InlineMath>{"\\Lambda"}</InlineMath> is diagonal,{" "}
+          <InlineMath>{"\\Lambda^k"}</InlineMath> is trivial — just raise each diagonal entry to the power{" "}
+          <InlineMath>{"k"}</InlineMath>. No matrix multiplication needed:
+        </p>
+        <MathBlock latex={
+          "\\Lambda^k = " +
+          "\\begin{bmatrix}" +
+          "\\lambda_1^k & 0 & \\cdots & 0 \\\\" +
+          "0 & \\lambda_2^k & \\cdots & 0 \\\\" +
+          "\\vdots & \\vdots & \\ddots & \\vdots \\\\" +
+          "0 & 0 & \\cdots & \\lambda_N^k" +
+          "\\end{bmatrix}"
+        } />
+        <p style={{ color: "var(--text-secondary)", fontSize: 14, margin: "0.75rem 0 0.5rem" }}>
+          With the current eigenvalues at <InlineMath>{"k = " + step}</InlineMath>:
+        </p>
+        {/* Computed Λ^k diagonal matrix */}
+        <div style={{ overflowX: "auto" }}>
+          <div style={{ fontSize: 13 }} dangerouslySetInnerHTML={{ __html: katex.renderToString(
+            "\\Lambda^{" + step + "} = \\begin{bmatrix}" +
+            eigenvalues.map((lam, i) =>
+              eigenvalues.map((_, j) => {
+                if (i !== j) return "\\textcolor{#888}{0}";
+                const val = Math.pow(lam, step);
+                const str = val < 1e-9 ? "0" : val < 1e4 ? val.toFixed(3) : val.toExponential(2);
+                return lam < 1e-4
+                  ? `\\textcolor{${RED}}{${str}}`
+                  : str;
+              }).join(" & ")
+            ).join(" \\\\ ") +
+            "\\end{bmatrix}",
+            { throwOnError: false, displayMode: true }
+          )}} />
+        </div>
+      </div>
+
+      {/* ── Section 5: The efficient pipeline ── */}
+      <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "1.25rem 1.5rem", marginBottom: "1rem" }}>
+        <h3 style={{ marginBottom: "0.5rem", marginTop: 0 }}>The efficient pipeline</h3>
+        <p style={{ color: "var(--text-secondary)", fontSize: 14, marginBottom: "1rem" }}>
+          Instead of computing{" "}
+          <InlineMath>{"V\\Lambda^k V^T \\cdot \\mathbf{x}_0"}</InlineMath>
+          {" "}as one block, split into three steps:
+        </p>
+
+        {/* Numbered cards */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.65rem", marginBottom: "1.5rem" }}>
+          {[
+            {
+              n: "01", accent: GOLD,
+              title: <>Project into eigenvector space <span style={{ fontWeight: 400, color: "var(--text-muted)", fontSize: 13 }}>(done once)</span></>,
+              eq: "\\tilde{\\mathbf{x}}_0 = V^T \\cdot \\mathbf{x}_0",
+              body: <>
+                Express <InlineMath>{"\\mathbf{x}_0"}</InlineMath> in the coordinate system of the eigenvectors.
+                Computed once when the source node is selected. Cost: <InlineMath>{"O(n^2)"}</InlineMath>.
+              </>,
+            },
+            {
+              n: "02", accent: "#4F8CFF",
+              title: <>Scale by <InlineMath>{"\\Lambda^k"}</InlineMath> <span style={{ fontWeight: 400, color: "var(--text-muted)", fontSize: 13 }}>(cheap, per step)</span></>,
+              eq: "\\tilde{\\mathbf{x}}_k = \\Lambda^k \\cdot \\tilde{\\mathbf{x}}_0",
+              body: <>
+                Multiply each component of <InlineMath>{"\\tilde{\\mathbf{x}}_0"}</InlineMath> by{" "}
+                <InlineMath>{"\\lambda_i^k"}</InlineMath>. Since <InlineMath>{"\\Lambda"}</InlineMath> is diagonal
+                this is just <InlineMath>{"n"}</InlineMath> scalar multiplications. Cost:{" "}
+                <InlineMath>{"O(n)"}</InlineMath>.
+              </>,
+            },
+            {
+              n: "03", accent: "#1D9E75",
+              title: <>Project back to node space <span style={{ fontWeight: 400, color: "var(--text-muted)", fontSize: 13 }}>(per step)</span></>,
+              eq: "\\mathbf{x}_k = V \\cdot \\tilde{\\mathbf{x}}_k",
+              body: <>
+                Convert from eigenvector coordinates back to node values. Cost:{" "}
+                <InlineMath>{"O(n^2)"}</InlineMath>.
+              </>,
+            },
+          ].map(({ n, accent, title, eq, body }) => (
+            <div key={n} style={{
+              display: "grid", gridTemplateColumns: "36px 1fr",
+              background: "var(--surface)", border: `0.5px solid ${accent}`,
+              borderRadius: 10, overflow: "hidden",
+            }}>
+              <div style={{
+                background: "var(--metric-bg)", display: "flex", alignItems: "center",
+                justifyContent: "center", fontSize: 14, fontWeight: 700,
+                color: accent, borderRight: "0.5px solid var(--border)",
+              }}>{n}</div>
+              <div style={{ padding: "10px 14px" }}>
+                <div style={{ fontSize: 15, fontWeight: 500, marginBottom: 6 }}>{title}</div>
+                <div style={{ marginBottom: 6 }}
+                  dangerouslySetInnerHTML={{ __html: katex.renderToString(eq, { throwOnError: false, displayMode: true }) }}
+                />
+                <div style={{ fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.6 }}>{body}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Pipeline flow row */}
+        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8, justifyContent: "center" }}>
+          {/* x₀ */}
+          <div style={{ textAlign: "center" }}>
+            <div style={{
+              fontFamily: "monospace", fontSize: 14, fontWeight: 600,
+              padding: "6px 12px", borderRadius: 8,
+              background: "var(--metric-bg)", border: "0.5px solid var(--border)",
+            }}>
+              <InlineMath>{"\\mathbf{x}_0"}</InlineMath>
+            </div>
+          </div>
+          {/* →[Vᵀ]→ once */}
+          {[
+            { label: "V^T",    cost: "once",     color: GOLD    },
+            { label: "\\times\\Lambda^k", cost: "O(n)",  color: "#4F8CFF" },
+            { label: "V",      cost: "O(n^2)",   color: "#1D9E75" },
+          ].map(({ label, cost, color }, idx) => {
+            const midLabels = [
+              <><InlineMath>{"\\tilde{\\mathbf{x}}_0"}</InlineMath></>,
+              <><InlineMath>{"\\tilde{\\mathbf{x}}_k"}</InlineMath></>,
+              <><InlineMath>{"\\mathbf{x}_k"}</InlineMath></>,
+            ];
+            return (
+              <div key={idx} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {/* arrow + badge */}
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <span style={{ color: "var(--text-muted)", fontSize: 16 }}>→</span>
+                    <span style={{
+                      background: color, color: "#fff", fontSize: 12, fontWeight: 600,
+                      padding: "2px 8px", borderRadius: 20,
+                    }}>
+                      <span dangerouslySetInnerHTML={{ __html: katex.renderToString(label, { throwOnError: false }) }} />
+                    </span>
+                    <span style={{ color: "var(--text-muted)", fontSize: 16 }}>→</span>
+                  </div>
+                  <span style={{ fontSize: 11, color: "var(--text-muted)" }}>{cost}</span>
+                </div>
+                {/* result node */}
+                <div style={{ textAlign: "center" }}>
+                  <div style={{
+                    fontFamily: "monospace", fontSize: 14, fontWeight: 600,
+                    padding: "6px 12px", borderRadius: 8,
+                    background: "var(--metric-bg)", border: "0.5px solid var(--border)",
+                  }}>
+                    {midLabels[idx]}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Section 6: Cost comparison callout ── */}
+      <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "1.25rem 1.5rem", marginBottom: "1rem" }}>
+        <h3 style={{ marginBottom: "0.75rem", marginTop: 0 }}>Cost comparison</h3>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "1rem" }}>
+          {/* Naive */}
+          <div style={{
+            border: `0.5px solid ${RED}`, borderRadius: 10, padding: "12px 16px",
+            background: isDark ? "rgba(232,93,36,0.07)" : "rgba(232,93,36,0.04)",
+          }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: RED, marginBottom: 8 }}>Naive</div>
+            <div dangerouslySetInnerHTML={{ __html: katex.renderToString(
+              "\\mathbf{x}_k = L^k \\cdot \\mathbf{x}_0",
+              { throwOnError: false, displayMode: true }
+            )}} />
+            <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 8 }}>
+              Cost: <InlineMath>{"O(n^3)"}</InlineMath> per step
+            </div>
+          </div>
+          {/* Efficient */}
+          <div style={{
+            border: "0.5px solid #1D9E75", borderRadius: 10, padding: "12px 16px",
+            background: isDark ? "rgba(29,158,117,0.07)" : "rgba(29,158,117,0.04)",
+          }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#1D9E75", marginBottom: 8 }}>Efficient</div>
+            <div dangerouslySetInnerHTML={{ __html: katex.renderToString(
+              "\\tilde{\\mathbf{x}}_0 = V^T\\mathbf{x}_0 \\quad \\text{(once, } O(n^2)\\text{)} \\\\" +
+              "\\tilde{\\mathbf{x}}_k = \\Lambda^k \\tilde{\\mathbf{x}}_0 \\quad \\text{(per step, } O(n)\\text{)} \\\\" +
+              "\\mathbf{x}_k = V\\tilde{\\mathbf{x}}_k \\quad \\text{(per step, } O(n^2)\\text{)}",
+              { throwOnError: false, displayMode: true }
+            )}} />
+          </div>
+        </div>
+
+        <Callout borderColor={"#4F8CFF"} bg={isDark ? "rgba(79,140,255,0.08)" : "rgba(79,140,255,0.05)"}>
+          For large graphs the difference is enormous. This is why eigendecomposition is not just a mathematical curiosity —
+          it has direct computational consequences. The same <InlineMath>{"V"}</InlineMath> and{" "}
+          <InlineMath>{"\\Lambda"}</InlineMath> computed once for spectral clustering can be reused here for free.
+        </Callout>
+      </div>
 
       {/* Navigation */}
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: "1rem" }}>

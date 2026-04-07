@@ -134,7 +134,7 @@ function KatexMatrixFull({ mat, eigenvalues, isDark }) {
       const isZeroEig = eigenvalues[ci] < ZERO_THRESHOLD;
       const val = Math.abs(v) < 1e-9 ? 0 : parseFloat(v.toFixed(3));
       const str = val === 0
-        ? `\\textcolor{${zero}}{0}`
+        ? `\\textcolor{${zero}}{\\phantom{-}0}`
         : isZeroEig
         ? `\\textcolor{${RED}}{${val < 0 ? val : `\\phantom{-}${val}`}}`
         : `${val < 0 ? val : `\\phantom{-}${val}`}`;
@@ -212,39 +212,9 @@ export default function GraphStage2({ isDark, graph, goToGraph1, goToGraph3 }) {
         <em>connected components</em> in the graph — each component is a cluster.
       </p>
 
-      {/* Callout */}
-      <Callout borderColor={RED} bg={isDark ? "rgba(232,93,36,0.09)" : "rgba(232,93,36,0.06)"}>
-        <strong style={{ color: RED }}>
-          {k} eigenvalue{k !== 1 ? "s" : ""} ≈ 0
-        </strong>
-        {" → "}
-        <strong>{k} cluster{k !== 1 ? "s" : ""} detected.</strong>
-        {"  "}
-        {k === 1
-          ? "The graph is fully connected — all nodes belong to a single cluster."
-          : <>
-              The graph has <strong>{k}</strong> disconnected component{k !== 1 ? "s" : ""}. <br />
-              Nodes are coloured by component:{" "} <br />
-              {clusterColors.map((c, i) => (
-                <span key={i} style={{ marginRight: 8 }}>
-                  <span style={{ display: "inline-block", width: 10, height: 10, background: c, borderRadius: 2, marginRight: 3, verticalAlign: "middle" }} />
-                  Cluster {i + 1}
-                </span>
-              ))}
-            </>}
-      </Callout>
-
-      {/* Canvas */}
-      <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, overflow: "hidden", marginTop: "1.25rem", marginBottom: "1.5rem" }}>
-        <div style={{ fontSize: 14, color: "var(--text-muted)", padding: "10px 14px" }}>
-          Nodes coloured by cluster membership
-        </div>
-        <GraphCanvas nodes={graph.nodes} edges={graph.edges} clusterOf={clusterOf} isDark={isDark} />
-      </div>
-
       {/* ── Section 1: Eigendecomposition equation ── */}
       <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "1.25rem 1.5rem", marginBottom: "1rem" }}>
-        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 10 }}>Eigendecomposition</div>
+        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 10 }}><h3>Eigendecomposition of L</h3></div>
         <MathBlock latex={
           `Lv_1 = \\lambda_1 v_1 \\\\` +
           `Lv_2 = \\lambda_2 v_2 \\\\` +
@@ -283,10 +253,41 @@ export default function GraphStage2({ isDark, graph, goToGraph1, goToGraph3 }) {
         </div>
       </div>
 
+      {/* Canvas */}
+      <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, overflow: "hidden", marginTop: "1.25rem", marginBottom: "1.5rem" }}>
+        <div style={{ fontSize: 14, color: "var(--text-muted)", padding: "10px 14px" }}>
+          Nodes coloured by cluster membership
+        </div>
+        <GraphCanvas nodes={graph.nodes} edges={graph.edges} clusterOf={clusterOf} isDark={isDark} />
+      </div>
+
+      {/* Callout */}
+      <Callout borderColor={RED} bg={isDark ? "rgba(232,93,36,0.09)" : "rgba(232,93,36,0.06)"}>
+        <strong style={{ color: RED }}>
+          {k} eigenvalue{k !== 1 ? "s" : ""} = 0
+        </strong>
+        {" → "}
+        <strong>{k} cluster{k !== 1 ? "s" : ""} detected.</strong>
+        {"  "}
+        {k === 1
+          ? "The graph is fully connected — all nodes belong to a single cluster."
+          : <>
+              The graph has <strong>{k}</strong> disconnected component{k !== 1 ? "s" : ""}. <br />
+              Nodes are coloured by component:{" "} <br />
+              {clusterColors.map((c, i) => (
+                <span key={i} style={{ marginRight: 8 }}>
+                  <span style={{ display: "inline-block", width: 10, height: 10, background: c, borderRadius: 2, marginRight: 3, verticalAlign: "middle" }} />
+                  Cluster {i + 1}
+                </span>
+              ))}
+            </>}
+      </Callout>
+      <br />
+
       {/* ── Section 2: Computed Λ matrix ── */}
       <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "1.25rem 1.5rem", marginBottom: "1rem" }}>
         <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>
-          Computed <InlineMath>{"\\Lambda"}</InlineMath> (eigenvalue matrix)
+          <h3>Computed <InlineMath>{"\\Lambda"}</InlineMath> (eigenvalue matrix)</h3>
         </div>
         <div style={{ fontSize: 15, color: "var(--text-secondary)", marginBottom: 10 }}>
           Diagonal entries are the eigenvalues{" "}
@@ -335,7 +336,7 @@ export default function GraphStage2({ isDark, graph, goToGraph1, goToGraph3 }) {
       {/* ── Section 3: Computed V matrix ── */}
       <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "1.25rem 1.5rem", marginBottom: "1rem" }}>
         <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>
-          Computed <InlineMath>{"V"}</InlineMath> (eigenvector matrix)
+          <h3>Computed <InlineMath>{"V"}</InlineMath> (eigenvector matrix)</h3>
         </div>
         <div style={{ fontSize: 15, color: "var(--text-secondary)", marginBottom: 10 }}>
           Eigenvectors in <span style={{ color: RED }}>red</span> are the eigenvectors corresponding to zero eigenvalues <InlineMath>{"(\\lambda = 0)"}</InlineMath>{" "}.
@@ -347,7 +348,7 @@ export default function GraphStage2({ isDark, graph, goToGraph1, goToGraph3 }) {
       {/* ── Cluster membership (zero-eigenvectors) ── */}
       <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "1rem 1.5rem", marginBottom: "1rem" }}>
         <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>
-          Zero-eigenvalue eigenvectors — cluster membership
+          <h3>Zero-eigenvalue eigenvectors — cluster membership</h3>
         </div>
         <div style={{ fontSize: 15, color: "var(--text-secondary)", marginBottom: 10 }}>
           Each row is a node. Rows with the same background colour belong to the same cluster.

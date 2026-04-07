@@ -63,3 +63,15 @@ button.btn-primary {
 button.btn-primary:hover {
   opacity: 0.85;
 }
+button.btn-secondary {
+  background: var(--text-primary);
+  color: var(--bg);
+  opacity: 0.7;
+  border-color: transparent;
+}
+button.btn-secondary:hover {
+  background: var(--text-primary);
+  color: var(--bg);
+  opacity: 0.6;
+  border-color: transparent;
+}

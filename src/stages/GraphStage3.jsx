@@ -69,6 +69,23 @@ function buildLaplacian(edges) {
   return A.map((row, i) => row.map((v, j) => (i === j ? deg[i] : -v)));
 }
 
+function buildNormalisedLaplacian(edges) {
+  const A = Array.from({ length: N }, () => Array(N).fill(0));
+  const deg = Array(N).fill(0);
+  edges.forEach(([a, b]) => {
+    A[a - 1][b - 1] = 1; A[b - 1][a - 1] = 1;
+    deg[a - 1]++; deg[b - 1]++;
+  });
+  const dinvsqrt = deg.map(d => d > 0 ? 1 / Math.sqrt(d) : 0);
+  // L_N = D^{-1/2} (D - A) D^{-1/2}
+  return Array.from({ length: N }, (_, i) =>
+    Array.from({ length: N }, (_, j) => {
+      const lij = i === j ? deg[i] : -A[i][j];
+      return dinvsqrt[i] * lij * dinvsqrt[j];
+    })
+  );
+}
+
 function matVec(M, v) {
   return M.map(row => row.reduce((s, m, j) => s + m * v[j], 0));
 }
@@ -96,18 +113,32 @@ function reachableCount(dist) {
 // ── main component ─────────────────────────────────────────────────────────────
 
 export default function GraphStage3({ isDark, graph, goToGraph1, goToGraph2 }) {
-  const [sourceIdx, setSourceIdx] = useState(null);
-  const [step,      setStep]      = useState(0);
-  const [vec,       setVec]       = useState(null); // L^k · e_source
+  const [sourceIdx,  setSourceIdx]  = useState(null);
+  const [step,       setStep]       = useState(0);
+  const [vec,        setVec]        = useState(null);
+  const [normalised, setNormalised] = useState(false);
   const canvasRef = useRef(null);
 
-  const L = useMemo(() => buildLaplacian(graph.edges), [graph.edges]);
+  const L = useMemo(
+    () => normalised ? buildNormalisedLaplacian(graph.edges) : buildLaplacian(graph.edges),
+    [graph.edges, normalised]
+  );
 
-  // Sorted eigenvalues of L (ascending, clamped ≥ 0)
+  // Sorted eigenvalues (ascending, clamped ≥ 0)
   const eigenvalues = useMemo(() => {
     const { eigenvalues: raw } = jacobiEigenN(L);
     return [...raw].sort((a, b) => a - b).map(v => Math.max(0, v));
   }, [L]);
+
+  // Reset step counter when toggling between L and L_N
+  useEffect(() => {
+    setStep(0);
+    if (sourceIdx !== null) {
+      const x0 = Array(N).fill(0);
+      x0[sourceIdx] = 1;
+      setVec(x0);
+    }
+  }, [normalised]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // BFS distances from source
   const distances = useMemo(
@@ -328,10 +359,17 @@ export default function GraphStage3({ isDark, graph, goToGraph1, goToGraph2 }) {
         background: "var(--surface)", border: "0.5px solid var(--border)",
         borderRadius: 12, overflow: "hidden", marginBottom: "1rem",
       }}>
-        <div style={{ fontSize: 14, color: "var(--text-muted)", padding: "10px 14px" }}>
-          {sourceIdx === null
-            ? "Click a node to begin"
-            : <>Source: Node {graph.nodes[sourceIdx]?.id} · Step <InlineMath>{"k = " + step}</InlineMath></>}
+        <div style={{ fontSize: 14, color: "var(--text-muted)", padding: "8px 14px", display: "flex", alignItems: "center" }}>
+          <span>
+            {sourceIdx === null
+              ? "Click a node to begin"
+              : <>Source: Node {graph.nodes[sourceIdx]?.id} · Step <InlineMath>{"k = " + step}</InlineMath></>}
+          </span>
+          {sourceIdx !== null && (
+            <button onClick={reset} style={{ marginLeft: "auto", fontSize: 13, padding: "4px 12px" }}>
+              Reset
+            </button>
+          )}
         </div>
         <canvas
           ref={canvasRef}
@@ -340,26 +378,31 @@ export default function GraphStage3({ isDark, graph, goToGraph1, goToGraph2 }) {
         />
       </div>
 
-      {/* Controls */}
-      <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: "1.5rem" }}>
+      {/* L / L_N toggle + Next Step */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: "1.5rem", flexWrap: "wrap" }}>
+        <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>Laplacian:</span>
+        <button
+          className={!normalised ? "btn-primary" : ""}
+          onClick={() => setNormalised(false)}
+          style={{ fontSize: 13, padding: "5px 14px" }}
+        >
+          L (unnormalised)
+        </button>
+        <button
+          className={normalised ? "btn-primary" : ""}
+          onClick={() => setNormalised(true)}
+          style={{ fontSize: 13, padding: "5px 14px" }}
+        >
+          L<sub>N</sub> (normalised)
+        </button>
         <button
           className="btn-primary"
           onClick={nextStep}
-          disabled={sourceIdx === null || step == MAX_STEPS}
-          style={{ fontSize: 14, padding: "8px 20px" }}
+          disabled={sourceIdx === null || step >= MAX_STEPS}
+          style={{ fontSize: 13, padding: "5px 14px", marginLeft: "auto" }}
         >
           Next Step →
         </button>
-        <span style={{ fontSize: 14, color: "var(--text-muted)" }}>
-          {sourceIdx !== null
-            ? <><InlineMath>{"k = " + step}</InlineMath></>
-            : "Select a node first"}
-        </span>
-        {sourceIdx !== null && (
-          <button onClick={reset} style={{ marginLeft: "auto", fontSize: 14, padding: "8px 14px" }}>
-            Reset
-          </button>
-        )}
       </div>
 
       {/* Legend */}
@@ -386,7 +429,9 @@ export default function GraphStage3({ isDark, graph, goToGraph1, goToGraph2 }) {
           <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>
             Influence vector{" "}
             <InlineMath>
-              {"\\mathbf{x}_{" + step + "} = L^{" + step + "} \\cdot \\mathbf{x}_0"}
+              {normalised
+                ? "\\mathbf{x}_{" + step + "} = L_N^{" + step + "} \\cdot \\mathbf{x}_0"
+                : "\\mathbf{x}_{" + step + "} = L^{" + step + "} \\cdot \\mathbf{x}_0"}
             </InlineMath>
           </div>
           <div style={{ fontSize: 15, color: "var(--text-secondary)", marginBottom: 8 }}>
@@ -479,19 +524,27 @@ export default function GraphStage3({ isDark, graph, goToGraph1, goToGraph2 }) {
         </div>
       )}
       
-      {/* ── Section 1: Observation callout ── */}
+      {/* ── Observation callout ── */}
       <Callout borderColor={GOLD} bg={isDark ? "rgba(251,157,7,0.08)" : "rgba(251,157,7,0.06)"}>
         You just watched{" "}
         <InlineMath>{"\\mathbf{x}_k = L^k \\cdot \\mathbf{x}_0"}</InlineMath>
-        {" "}computed step by step — each step multiplies the current state by{" "}
-        <InlineMath>{"L"}</InlineMath>. This works fine for 10 nodes.
-        But what if the graph had <strong>1 million nodes</strong>?
+        {" "}computed step by step. This works fine for 10 nodes, but naive computation of{" "}
+        <InlineMath>{"L^k"}</InlineMath> has <strong>two problems</strong> that make it unusable at scale.
       </Callout>
 
-      {/* ── Section 2: The problem with the naive approach ── */}
-      <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "1.25rem 1.5rem", marginTop: "1rem", marginBottom: "1rem" }}>
+      {/* ══════════════════════════════════════════════════════════ */}
+      {/* Problem 1                                                  */}
+      {/* ══════════════════════════════════════════════════════════ */}
+      <h2 style={{ marginTop: "1.75rem", marginBottom: "0.75rem" }}>
+        Problem 1: Computational cost of <InlineMath>{"L^k"}</InlineMath>
+      </h2>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+
+      {/* ── h3: The problem with the naive approach ── */}
+      <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "1.25rem 1.5rem" }}>
         <h3 style={{ marginBottom: "0.5rem", marginTop: 0 }}>The problem with the naive approach</h3>
-        <p style={{ color: "var(--text-secondary)", fontSize: 14, marginBottom: "0.75rem" }}>
+        <p style={{ color: "var(--text-secondary)", fontSize: 15, marginBottom: "0.75rem" }}>
           Computing <InlineMath>{"L^k"}</InlineMath> directly requires{" "}
           <InlineMath>{"k"}</InlineMath> matrix multiplications. Each multiplication of two{" "}
           <InlineMath>{"N \\times N"}</InlineMath> matrices costs{" "}
@@ -513,24 +566,23 @@ export default function GraphStage3({ isDark, graph, goToGraph1, goToGraph2 }) {
                 ["1,000,000 nodes", <InlineMath key="c">{"10^{18}"}</InlineMath>],
               ].map(([size, ops]) => (
                 <tr key={size} style={{ borderBottom: "0.5px solid var(--border)" }}>
-                  <td style={{ padding: "7px 16px", fontFamily: "monospace", fontSize: 13 }}>{size}</td>
-                  <td style={{ padding: "7px 16px" }}>{ops}</td>
+                  <td style={{ padding: "7px 16px", fontSize: 14 }}>{size}</td>
+                  <td style={{ padding: "7px 16px", fontSize: 13 }}>{ops}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <p style={{ color: "var(--text-muted)", fontSize: 14, margin: 0 }}>We need a smarter way.</p>
       </div>
 
       {/* ── Section 3: Key observation ── */}
-      <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "1.25rem 1.5rem", marginBottom: "1rem" }}>
+      <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "1.25rem 1.5rem" }}>
         <h3 style={{ marginBottom: "0.5rem", marginTop: 0 }}>Key observation: <InlineMath>{"L"}</InlineMath> is symmetric</h3>
-        <p style={{ color: "var(--text-secondary)", fontSize: 14, marginBottom: "0.5rem" }}>
+        <p style={{ color: "var(--text-secondary)", fontSize: 15, marginBottom: "0.5rem" }}>
           Since <InlineMath>{"L = D - A"}</InlineMath> is symmetric, its eigenvectors are <strong>orthonormal</strong> (orthogonal + unit length):
         </p>
         <MathBlock latex={"V^T V = I \\iff V V^T = I"} />
-        <p style={{ color: "var(--text-secondary)", fontSize: 14, margin: "0.5rem 0" }}>
+        <p style={{ color: "var(--text-secondary)", fontSize: 15, margin: "0.5rem 0" }}>
           Given <InlineMath>{"LV = V\\Lambda"}</InlineMath>:
         </p>
         <MathBlock latex={
@@ -540,9 +592,9 @@ export default function GraphStage3({ isDark, graph, goToGraph1, goToGraph2 }) {
       </div>
 
       {/* ── Section 4: Raising L to the k-th power ── */}
-      <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "1.25rem 1.5rem", marginBottom: "1.5rem" }}>
+      <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "1.25rem 1.5rem" }}>
         <h3 style={{ marginBottom: "0.5rem", marginTop: 0 }}>Raising <InlineMath>{"L"}</InlineMath> to the <InlineMath>{"k"}</InlineMath>-th power</h3>
-        <p style={{ color: "var(--text-secondary)", fontSize: 14, marginBottom: "0.5rem" }}>
+        <p style={{ color: "var(--text-secondary)", fontSize: 15, marginBottom: "0.5rem" }}>
           When we square <InlineMath>{"L"}</InlineMath>:
         </p>
         <MathBlock latex={
@@ -559,7 +611,7 @@ export default function GraphStage3({ isDark, graph, goToGraph1, goToGraph2 }) {
         }}>
           <div dangerouslySetInnerHTML={{ __html: katex.renderToString("L^k = V\\Lambda^k V^T", { throwOnError: false, displayMode: true }) }} />
         </div>
-        <p style={{ color: "var(--text-secondary)", fontSize: 14, margin: "0.75rem 0 0.5rem" }}>
+        <p style={{ color: "var(--text-secondary)", fontSize: 15, margin: "0.75rem 0 0.5rem" }}>
           And since <InlineMath>{"\\Lambda"}</InlineMath> is diagonal,{" "}
           <InlineMath>{"\\Lambda^k"}</InlineMath> is trivial — just raise each diagonal entry to the power{" "}
           <InlineMath>{"k"}</InlineMath>. No matrix multiplication needed:
@@ -573,33 +625,12 @@ export default function GraphStage3({ isDark, graph, goToGraph1, goToGraph2 }) {
           "0 & 0 & \\cdots & \\lambda_N^k" +
           "\\end{bmatrix}"
         } />
-        <p style={{ color: "var(--text-secondary)", fontSize: 14, margin: "0.75rem 0 0.5rem" }}>
-          With the current eigenvalues at <InlineMath>{"k = " + step}</InlineMath>:
-        </p>
-        {/* Computed Λ^k diagonal matrix */}
-        <div style={{ overflowX: "auto" }}>
-          <div style={{ fontSize: 13 }} dangerouslySetInnerHTML={{ __html: katex.renderToString(
-            "\\Lambda^{" + step + "} = \\begin{bmatrix}" +
-            eigenvalues.map((lam, i) =>
-              eigenvalues.map((_, j) => {
-                if (i !== j) return "\\textcolor{#888}{0}";
-                const val = Math.pow(lam, step);
-                const str = val < 1e-9 ? "0" : val < 1e4 ? val.toFixed(3) : val.toExponential(2);
-                return lam < 1e-4
-                  ? `\\textcolor{${RED}}{${str}}`
-                  : str;
-              }).join(" & ")
-            ).join(" \\\\ ") +
-            "\\end{bmatrix}",
-            { throwOnError: false, displayMode: true }
-          )}} />
-        </div>
       </div>
 
       {/* ── Section 5: The efficient pipeline ── */}
-      <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "1.25rem 1.5rem", marginBottom: "1rem" }}>
+      <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "1.25rem 1.5rem" }}>
         <h3 style={{ marginBottom: "0.5rem", marginTop: 0 }}>The efficient pipeline</h3>
-        <p style={{ color: "var(--text-secondary)", fontSize: 14, marginBottom: "1rem" }}>
+        <p style={{ color: "var(--text-secondary)", fontSize: 15, marginBottom: "1rem" }}>
           Instead of computing{" "}
           <InlineMath>{"V\\Lambda^k V^T \\cdot \\mathbf{x}_0"}</InlineMath>
           {" "}as one block, split into three steps:
@@ -610,7 +641,7 @@ export default function GraphStage3({ isDark, graph, goToGraph1, goToGraph2 }) {
           {[
             {
               n: "01", accent: GOLD,
-              title: <>Project into eigenvector space <span style={{ fontWeight: 400, color: "var(--text-muted)", fontSize: 13 }}>(done once)</span></>,
+              title: <>Project into eigenvector space <span style={{ fontWeight: 400, color: "var(--text-muted)", fontSize: 14 }}>(done once)</span></>,
               eq: "\\tilde{\\mathbf{x}}_0 = V^T \\cdot \\mathbf{x}_0",
               body: <>
                 Express <InlineMath>{"\\mathbf{x}_0"}</InlineMath> in the coordinate system of the eigenvectors.
@@ -619,7 +650,7 @@ export default function GraphStage3({ isDark, graph, goToGraph1, goToGraph2 }) {
             },
             {
               n: "02", accent: "#4F8CFF",
-              title: <>Scale by <InlineMath>{"\\Lambda^k"}</InlineMath> <span style={{ fontWeight: 400, color: "var(--text-muted)", fontSize: 13 }}>(cheap, per step)</span></>,
+              title: <>Scale by <InlineMath>{"\\Lambda^k"}</InlineMath> <span style={{ fontWeight: 400, color: "var(--text-muted)", fontSize: 14 }}>(cheap, per step)</span></>,
               eq: "\\tilde{\\mathbf{x}}_k = \\Lambda^k \\cdot \\tilde{\\mathbf{x}}_0",
               body: <>
                 Multiply each component of <InlineMath>{"\\tilde{\\mathbf{x}}_0"}</InlineMath> by{" "}
@@ -630,7 +661,7 @@ export default function GraphStage3({ isDark, graph, goToGraph1, goToGraph2 }) {
             },
             {
               n: "03", accent: "#1D9E75",
-              title: <>Project back to node space <span style={{ fontWeight: 400, color: "var(--text-muted)", fontSize: 13 }}>(per step)</span></>,
+              title: <>Project back to node space <span style={{ fontWeight: 400, color: "var(--text-muted)", fontSize: 14 }}>(per step)</span></>,
               eq: "\\mathbf{x}_k = V \\cdot \\tilde{\\mathbf{x}}_k",
               body: <>
                 Convert from eigenvector coordinates back to node values. Cost:{" "}
@@ -752,10 +783,118 @@ export default function GraphStage3({ isDark, graph, goToGraph1, goToGraph2 }) {
           it has direct computational consequences. The same <InlineMath>{"V"}</InlineMath> and{" "}
           <InlineMath>{"\\Lambda"}</InlineMath> computed once for spectral clustering can be reused here for free.
         </Callout>
-      </div>
+      </div>{/* end cost-comparison card */}
+
+      </div>{/* end Problem 1 column wrapper */}
+
+      {/* ══════════════════════════════════════════════════════════ */}
+      {/* Problem 2                                                  */}
+      {/* ══════════════════════════════════════════════════════════ */}
+      <h2 style={{ marginTop: "1.75rem", marginBottom: "0.75rem" }}>
+        Problem 2: Values in <InlineMath>{"L^k \\mathbf{x}"}</InlineMath> explode
+      </h2>
+
+      <div style={{
+        display: "flex", flexDirection: "column", gap: "1rem",
+      }}>
+        <p style={{ color: "var(--text-secondary)", fontSize: 15, margin: 0 }}>
+          From the unnormalised infection spread graph above, notice how the values in the{" "}
+          <InlineMath>{"\\mathbf{x}_k[i]"}</InlineMath> column grow rapidly with each step.
+        </p>
+
+        <Callout borderColor={RED} bg={isDark ? "rgba(232,93,36,0.09)" : "rgba(232,93,36,0.06)"}>
+          Repeated multiplication by <InlineMath>{"L"}</InlineMath> causes values to grow without bound.
+          For large graphs or many steps, this makes the influence signal numerically meaningless
+          and causes gradient instability during neural network training.
+        </Callout>
+
+        {/* ── h3: The normalised Laplacian ── */}
+        <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "1.25rem 1.5rem" }}>
+          <h3 style={{ marginBottom: "0.5rem", marginTop: 0 }}>
+            The normalised Laplacian <InlineMath>{"L_N"}</InlineMath>
+          </h3>
+          <p style={{ color: "var(--text-secondary)", fontSize: 15, marginBottom: "0.5rem" }}>
+            The fix is to normalise <InlineMath>{"L"}</InlineMath> so that its eigenvalues are bounded
+            between 0 and 2, preventing explosion regardless of how large <InlineMath>{"k"}</InlineMath> gets.
+            The symmetrically normalised Laplacian is:
+          </p>
+          <MathBlock latex={"L_N = D^{-1/2}(D - A)D^{-1/2} = I - D^{-1/2}AD^{-1/2}"} />
+
+          <p style={{ color: "var(--text-secondary)", fontSize: 15, margin: "0.75rem 0 0.5rem" }}>
+            Since <InlineMath>{"D"}</InlineMath> is diagonal, <InlineMath>{"D^{-1/2}"}</InlineMath> is
+            trivial to compute — just take the reciprocal square root of each diagonal entry:
+          </p>
+          <MathBlock latex={"D^{-1/2} = \\begin{pmatrix} d_1^{-1/2} & 0 & \\cdots \\\\ 0 & d_2^{-1/2} & \\cdots \\\\ \\vdots & & \\ddots \\end{pmatrix}"} />
+
+          <p style={{ color: "var(--text-secondary)", fontSize: 15, margin: "0.75rem 0 0.5rem" }}>
+            The effect on each entry of <InlineMath>{"L_N"}</InlineMath>:
+          </p>
+          <MathBlock latex={"\\left(L_N\\right)_{ij} = \\begin{cases} 1 & \\text{if } i = j \\\\ -\\dfrac{1}{\\sqrt{d_i \\cdot d_j}} & \\text{if } i \\neq j \\text{ and nodes } i,j \\text{ are connected} \\\\ 0 & \\text{otherwise} \\end{cases}"} />
+
+          {/* Properties table */}
+          <div style={{ overflowX: "auto", marginBottom: "1rem" }}>
+            <table style={{ borderCollapse: "collapse", fontSize: 14, width: "100%" }}>
+              <thead>
+                <tr>
+                  {["Property", "L", "L\u2099"].map((h, i) => (
+                    <th key={h} style={{
+                      padding: "6px 12px", borderBottom: "0.5px solid var(--border)",
+                      color: i === 0 ? "var(--text-muted)" : i === 1 ? RED : "#1D9E75",
+                      fontWeight: 600, textAlign: i === 0 ? "left" : "center",
+                    }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { prop: "Symmetric",        l: "Yes",           ln: "Yes",          highlight: false },
+                  { prop: "Diagonal entries", l: "degree(i)",     ln: "1",            highlight: false },
+                  { prop: "Eigenvalue range", l: "0 to max deg",  ln: "0 to 2",       highlight: false },
+                  { prop: "Row sums",         l: "0",             ln: "not always 0", highlight: false },
+                  { key: "lkx", prop: <InlineMath>{"L^k\\mathbf{x}\\text{ values}"}</InlineMath>, l: "explode", ln: "stay bounded", highlight: true },
+                ].map(({ key, prop, l, ln, highlight }) => (
+                  <tr key={key ?? prop} style={{
+                    borderBottom: "0.5px solid var(--border)",
+                    background: highlight ? (isDark ? "rgba(29,158,117,0.09)" : "rgba(29,158,117,0.07)") : "transparent",
+                  }}>
+                    <td style={{ padding: "7px 12px", color: "var(--text-muted)" }}>{prop}</td>
+                    <td style={{ padding: "7px 12px", textAlign: "center", color: highlight ? RED : "var(--text-primary)", fontWeight: highlight ? 600 : 400 }}>{l}</td>
+                    <td style={{ padding: "7px 12px", textAlign: "center", color: highlight ? "#1D9E75" : "var(--text-primary)", fontWeight: highlight ? 600 : 400 }}>{ln}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <Callout borderColor={"#1D9E75"} bg={isDark ? "rgba(29,158,117,0.08)" : "rgba(29,158,117,0.05)"}>
+            Because eigenvalues of <InlineMath>{"L_N"}</InlineMath> are bounded between 0 and 2,
+            raising them to the <InlineMath>{"k"}</InlineMath>-th power never causes explosion.{" "}
+            <InlineMath>{"L_N^k"}</InlineMath> stays well-behaved for any <InlineMath>{"k"}</InlineMath>.
+          </Callout>
+
+          <div style={{ marginTop: "0.75rem" }}>
+            <Callout borderColor={"#4F8CFF"} bg={isDark ? "rgba(79,140,255,0.08)" : "rgba(79,140,255,0.05)"}>
+              Now toggle to <InlineMath>{"L_N"}</InlineMath> (normalised) in the{" "}
+              <button
+                onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+                style={{
+                  background: "none", border: "none", padding: 0, cursor: "pointer",
+                  color: "#4F8CFF", fontWeight: 600, textDecoration: "underline",
+                  fontSize: "inherit", fontFamily: "inherit",
+                }}
+              >
+                infection spread graph
+              </button>
+              {" "}above and step through again — notice how the values in{" "}
+              <InlineMath>{"\\mathbf{x}_k[i]"}</InlineMath> stay small and meaningful
+              regardless of how many steps you take.
+            </Callout>
+          </div>
+        </div>
+      </div>{/* end Problem 2 left-border wrapper */}
 
       {/* Navigation */}
-      <div style={{ display: "flex", justifyContent: "space-between", marginTop: "1rem" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginTop: "2rem" }}>
         <button onClick={goToGraph2} style={{ fontSize: 14, padding: "8px 18px" }}>
           ← Spectral Clustering
         </button>

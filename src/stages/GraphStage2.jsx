@@ -405,10 +405,10 @@ export default function GraphStage2({ isDark, graph, goToGraph1, goToGraph3 }) {
 
       {/* Navigation */}
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: "2rem" }}>
-        <button onClick={goToGraph1} style={{ fontSize: 14, padding: "8px 18px" }}>
+        <button onClick={() => { goToGraph1(); window.scrollTo({ top: 0, behavior: "instant" }); }} style={{ fontSize: 14, padding: "8px 18px" }}>
           ← Build a Graph
         </button>
-        <button className="btn-primary" onClick={goToGraph3} style={{ fontSize: 14, padding: "8px 18px" }}>
+        <button className="btn-primary" onClick={() => { goToGraph3(); window.scrollTo({ top: 0, behavior: "instant" }); }} style={{ fontSize: 14, padding: "8px 18px" }}>
           Next: Infection Spread →
         </button>
       </div>

@@ -156,14 +156,16 @@ export default function GraphStage3({ isDark, graph, goToGraph1, goToGraph2 }) {
     [distances]
   );
 
-  // Infected set: nodes with |vec[i]| > threshold
+  // Infected set: nodes with |vec[i]| > threshold, always includes source
   const infected = useMemo(() => {
     if (!vec) return new Set();
-    return new Set(vec.reduce((acc, v, i) => {
+    const set = new Set(vec.reduce((acc, v, i) => {
       if (Math.abs(v) > INF_THRESHOLD) acc.push(i);
       return acc;
     }, []));
-  }, [vec]);
+    if (sourceIdx !== null) set.add(sourceIdx);
+    return set;
+  }, [vec, sourceIdx]);
 
   function selectSource(ni) {
     const x0 = Array(N).fill(0);
@@ -306,8 +308,8 @@ export default function GraphStage3({ isDark, graph, goToGraph1, goToGraph2 }) {
         The colour fades from deep red (source) to green (further away).
       </p>
 
-      {/* Instruction banner */}
-      {sourceIdx === null && (
+      {/* Instruction banner — hide only when reach warning or step limit banner is showing */}
+      {!(sourceIdx !== null && reachable !== null && reachable <= REACH_WARN) && step < MAX_STEPS && (
         <div style={{
           background: isDark ? "rgba(79,140,255,0.1)" : "rgba(79,140,255,0.07)",
           padding: "10px 14px", marginBottom: "1rem",
@@ -380,7 +382,7 @@ export default function GraphStage3({ isDark, graph, goToGraph1, goToGraph2 }) {
 
       {/* L / L_N toggle + Next Step */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: "1.5rem", flexWrap: "wrap" }}>
-        <span style={{ fontSize: 13, color: "var(--text-secondary)" }}>Laplacian:</span>
+        <span style={{ fontSize: 14, color: "var(--text-secondary)" }}>Laplacian:</span>
         <button
           className={!normalised ? "btn-primary" : ""}
           onClick={() => setNormalised(false)}
@@ -895,7 +897,7 @@ export default function GraphStage3({ isDark, graph, goToGraph1, goToGraph2 }) {
 
       {/* Navigation */}
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: "2rem" }}>
-        <button onClick={goToGraph2} style={{ fontSize: 14, padding: "8px 18px" }}>
+        <button onClick={() => { goToGraph2(); window.scrollTo({ top: 0, behavior: "instant" }); }} style={{ fontSize: 14, padding: "8px 18px" }}>
           ← Spectral Clustering
         </button>
       </div>

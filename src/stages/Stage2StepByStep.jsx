@@ -396,8 +396,8 @@ export default function Stage2StepByStep({ isDark, goToStage1, goToGraph1 }) {
         {step === 3 ? (
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={() => setShapeKey(null)}>Choose another shape</button>
-            <button onClick={() => setShowSummary(true)}>View Summary</button>
-            <button className="btn-primary" onClick={goToGraph1}>Next: Graph Lab →</button>
+            <button onClick={() => { setShowSummary(true); window.scrollTo({ top: 0, behavior: "instant" }); }}>View Summary</button>
+            <button className="btn-primary" onClick={() => { goToGraph1(); window.scrollTo({ top: 0, behavior: "instant" }); }}>Next: Graph Lab →</button>
           </div>
         ) : (
           <button className="btn-primary" onClick={() => setStep(s => s + 1)}>
@@ -486,7 +486,7 @@ function SummarySection({ pca, centeredPts, onBackToShapes, goToGraph1, isDark }
       <Divider />
       <div style={{ display: "flex", justifyContent: "space-between" }}>
         <button onClick={onBackToShapes}>← Back to Shapes</button>
-        <button className="btn-primary" onClick={goToGraph1}>Next: Graph Lab →</button>
+        <button className="btn-primary" onClick={() => { goToGraph1(); window.scrollTo({ top: 0, behavior: "instant" }); }}>Next: Graph Lab →</button>
       </div>
     </div>
   );

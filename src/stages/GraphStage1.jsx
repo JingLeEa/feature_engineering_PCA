@@ -361,10 +361,10 @@ export default function GraphStage1({ isDark, graph, setGraph, goToGraph2, goToP
 
       {/* Navigation */}
       <div style={{ display: "flex", justifyContent: "space-between", marginTop: "2rem" }}>
-        <button onClick={goToPCA} style={{ fontSize: 14, padding: "8px 18px" }}>
+        <button onClick={() => { goToPCA(); window.scrollTo({ top: 0, behavior: "instant" }); }} style={{ fontSize: 14, padding: "8px 18px" }}>
           ← Back to PCA
         </button>
-        <button className="btn-primary" onClick={goToGraph2} style={{ fontSize: 14, padding: "8px 18px" }}>
+        <button className="btn-primary" onClick={() => { goToGraph2(); window.scrollTo({ top: 0, behavior: "instant" }); }} style={{ fontSize: 14, padding: "8px 18px" }}>
           Next: Spectral Clustering →
         </button>
       </div>

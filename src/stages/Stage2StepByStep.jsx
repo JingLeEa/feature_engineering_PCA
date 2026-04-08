@@ -959,6 +959,21 @@ function StepReduction({ pca, centeredPts, projPts, isDark }) {
         </div>
       </div>
 
+      {/* Stats */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: "1rem" }}>
+        <MetricCard label="Dimensions before" value="3" sub="x, y, z" />
+        <MetricCard label="Dimensions after"  value="2" sub="PC1, PC2" accent={GREEN} />
+        <MetricCard label="Variance retained" value={`${keptPct}%`} sub={`Lost only ${lostPct}% (PC3)`} accent={GOLD} />
+      </div>
+
+      <Callout borderColor={GREEN} bg={isDark ? "rgba(29,158,117,0.08)" : "rgba(29,158,117,0.06)"}>
+        <strong>We went from 3D to 2D retaining {keptPct}% of the variance.</strong>{" "}
+        The discarded dimension (PC3) carried only {lostPct}% of the information.
+        In real datasets with hundreds of dimensions, PCA can often retain 80–95% of variance
+        in just dozens of components.
+      </Callout>
+      <br />
+
       {/* Before / After — larger graphs */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: "0.75rem", alignItems: "center", marginBottom: "1rem" }}>
         <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "10px 12px" }}>
@@ -975,22 +990,6 @@ function StepReduction({ pca, centeredPts, projPts, isDark }) {
           </div>
         </div>
       </div>
-
-      {/* Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8, marginBottom: "1rem" }}>
-        <MetricCard label="Dimensions before" value="3" sub="x, y, z" />
-        <MetricCard label="Dimensions after"  value="2" sub="PC1, PC2" accent={GREEN} />
-        <MetricCard label="Variance retained" value={`${keptPct}%`} sub={`Lost only ${lostPct}% (PC3)`} accent={GOLD} />
-      </div>
-
-      <Callout borderColor={GREEN} bg={isDark ? "rgba(29,158,117,0.08)" : "rgba(29,158,117,0.06)"}>
-        <strong>We went from 3D to 2D retaining {keptPct}% of the variance.</strong>{" "}
-        The discarded dimension (PC3) carried only {lostPct}% of the information.
-        In real datasets with hundreds of dimensions, PCA can often retain 80–95% of variance
-        in just dozens of components.
-      </Callout>
-
-      <Divider />
 
       {/* ── TRACE A POINT ── */}
       {(() => {

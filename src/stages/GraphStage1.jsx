@@ -58,7 +58,9 @@ export default function GraphStage1({ isDark, graph, setGraph, goToGraph2, goToP
   const [selected, setSelected] = useState(null); // node id awaiting second click
   const canvasRef  = useRef(null);
   const dragging   = useRef(null);  // { id, ox, oy }
-  const dragMoved  = useRef(false); // did we actually move during this mousedown?
+  const dragMoved  = useRef(false); // did we actually move beyond threshold?
+  const dragStart  = useRef(null);  // { x, y } at mousedown, for sensitivity check
+  const DRAG_THRESHOLD = 4;         // px — movements smaller than this count as a click
 
   // Resolve normalised coords to canvas px
   function resolve(nx, ny) {
@@ -171,6 +173,7 @@ export default function GraphStage1({ isDark, graph, setGraph, goToGraph2, goToP
     const { x, y } = getCanvasPos(e);
     const node = hitNode(x, y);
     dragMoved.current = false;
+    dragStart.current = { x, y };
     if (node) {
       const p = resolve(node.nx, node.ny);
       dragging.current = { id: node.id, ox: x - p.x, oy: y - p.y };
@@ -180,9 +183,15 @@ export default function GraphStage1({ isDark, graph, setGraph, goToGraph2, goToP
   function onMouseMove(e) {
     if (!dragging.current) return;
     const { x, y } = getCanvasPos(e);
+    // Only count as a drag once the pointer moves beyond the threshold
+    if (!dragMoved.current && dragStart.current) {
+      const dx = x - dragStart.current.x;
+      const dy = y - dragStart.current.y;
+      if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+      dragMoved.current = true;
+    }
     const { id, ox, oy } = dragging.current;
     const { nx, ny } = toNorm(x - ox, y - oy);
-    dragMoved.current = true;
     setGraph(g => ({ ...g, nodes: g.nodes.map(n => n.id === id ? { ...n, nx, ny } : n) }));
   }
 

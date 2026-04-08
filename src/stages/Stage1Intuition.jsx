@@ -136,7 +136,7 @@ export default function Stage1Intuition({ isDark, goToStage2 }) {
         </div>
         <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "10px 12px" }}>
           <div style={{ fontSize: 14, color: "var(--text-muted)", textAlign: "center", marginBottom: 6 }}>
-            Projected space — axes fixed, points shift
+            Projected space — coordinates in PC frame
           </div>
           <div style={{ height: 250 }}>
             <ProjectedSpaceCanvas pts={PTS} angleDeg={angle} isDark={isDark} />

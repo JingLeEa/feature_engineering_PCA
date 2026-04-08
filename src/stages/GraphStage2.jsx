@@ -346,11 +346,12 @@ export default function GraphStage2({ isDark, graph, goToGraph1, goToGraph3 }) {
       </div>
 
       {/* ── Cluster membership (zero-eigenvectors) ── */}
-      <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "1rem 1.5rem", marginBottom: "1rem" }}>
+      <div style={{ background: "var(--surface)", border: "0.5px solid var(--border)", borderRadius: 12, padding: "1.25rem 1.5rem", marginBottom: "1rem" }}>
         <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>
           <h3>Zero-eigenvalue eigenvectors — cluster membership</h3>
         </div>
         <div style={{ fontSize: 15, color: "var(--text-secondary)", marginBottom: 10 }}>
+          We compare the row vectors of the eigenvectors corresponding to zero eigenvalues. <br />
           Each row is a node. Rows with the same background colour belong to the same cluster.
         </div>
         <div style={{ overflowX: "auto" }}>
@@ -363,7 +364,7 @@ export default function GraphStage2({ isDark, graph, goToGraph1, goToGraph3 }) {
                 {zeroEvecs.map((_, ci) => (
                   <th key={ci} style={{
                     padding: "5px 10px", borderBottom: "0.5px solid var(--border)",
-                    color: clusterColors[ci], fontWeight: 600, textAlign: "center",
+                    fontWeight: 600, textAlign: "center",
                   }}>
                     <InlineMath>{`v_{${ci + 1}} (\\lambda = 0)`}</InlineMath>
                   </th>

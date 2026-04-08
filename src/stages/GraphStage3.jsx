@@ -643,7 +643,7 @@ export default function GraphStage3({ isDark, graph, goToGraph1, goToGraph2 }) {
           {[
             {
               n: "01", accent: GOLD,
-              title: <>Project into eigenvector space <span style={{ fontWeight: 400, color: "var(--text-muted)", fontSize: 14 }}>(done once)</span></>,
+              title: <>Project into eigenvector space <span style={{ fontWeight: 400, color: "var(--text-muted)", fontSize: 15 }}>(done once)</span></>,
               eq: "\\tilde{\\mathbf{x}}_0 = V^T \\cdot \\mathbf{x}_0",
               body: <>
                 Express <InlineMath>{"\\mathbf{x}_0"}</InlineMath> in the coordinate system of the eigenvectors.
@@ -652,7 +652,7 @@ export default function GraphStage3({ isDark, graph, goToGraph1, goToGraph2 }) {
             },
             {
               n: "02", accent: "#4F8CFF",
-              title: <>Scale by <InlineMath>{"\\Lambda^k"}</InlineMath> <span style={{ fontWeight: 400, color: "var(--text-muted)", fontSize: 14 }}>(cheap, per step)</span></>,
+              title: <>Scale by <InlineMath>{"\\Lambda^k"}</InlineMath> <span style={{ fontWeight: 400, color: "var(--text-muted)", fontSize: 15 }}>(cheap, per step)</span></>,
               eq: "\\tilde{\\mathbf{x}}_k = \\Lambda^k \\cdot \\tilde{\\mathbf{x}}_0",
               body: <>
                 Multiply each component of <InlineMath>{"\\tilde{\\mathbf{x}}_0"}</InlineMath> by{" "}
@@ -663,7 +663,7 @@ export default function GraphStage3({ isDark, graph, goToGraph1, goToGraph2 }) {
             },
             {
               n: "03", accent: "#1D9E75",
-              title: <>Project back to node space <span style={{ fontWeight: 400, color: "var(--text-muted)", fontSize: 14 }}>(per step)</span></>,
+              title: <>Project back to node space <span style={{ fontWeight: 400, color: "var(--text-muted)", fontSize: 15 }}>(per step)</span></>,
               eq: "\\mathbf{x}_k = V \\cdot \\tilde{\\mathbf{x}}_k",
               body: <>
                 Convert from eigenvector coordinates back to node values. Cost:{" "}
@@ -756,12 +756,12 @@ export default function GraphStage3({ isDark, graph, goToGraph1, goToGraph2 }) {
             border: `0.5px solid ${RED}`, borderRadius: 10, padding: "12px 16px",
             background: isDark ? "rgba(232,93,36,0.07)" : "rgba(232,93,36,0.04)",
           }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: RED, marginBottom: 8 }}>Naive</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: RED, marginBottom: 8 }}>Naive</div>
             <div dangerouslySetInnerHTML={{ __html: katex.renderToString(
               "\\mathbf{x}_k = L^k \\cdot \\mathbf{x}_0",
               { throwOnError: false, displayMode: true }
             )}} />
-            <div style={{ fontSize: 13, color: "var(--text-secondary)", marginTop: 8 }}>
+            <div style={{ fontSize: 14, color: "var(--text-secondary)", marginTop: 8 }}>
               Cost: <InlineMath>{"O(n^3)"}</InlineMath> per step
             </div>
           </div>
@@ -770,7 +770,7 @@ export default function GraphStage3({ isDark, graph, goToGraph1, goToGraph2 }) {
             border: "0.5px solid #1D9E75", borderRadius: 10, padding: "12px 16px",
             background: isDark ? "rgba(29,158,117,0.07)" : "rgba(29,158,117,0.04)",
           }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#1D9E75", marginBottom: 8 }}>Efficient</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: "#1D9E75", marginBottom: 8 }}>Efficient</div>
             <div dangerouslySetInnerHTML={{ __html: katex.renderToString(
               "\\tilde{\\mathbf{x}}_0 = V^T\\mathbf{x}_0 \\quad \\text{(once, } O(n^2)\\text{)} \\\\" +
               "\\tilde{\\mathbf{x}}_k = \\Lambda^k \\tilde{\\mathbf{x}}_0 \\quad \\text{(per step, } O(n)\\text{)} \\\\" +

@@ -1098,8 +1098,8 @@ function StepReduction({ pca, centeredPts, projPts, isDark }) {
               <div style={{ display: "grid", gridTemplateColumns: "160px 1fr", gap: "0.5rem", alignItems: "center", padding: "10px 0" }}>
                 <div style={{ fontSize: 15, color: "var(--text-muted)", fontWeight: 500 }}>5. Final 2D point</div>
                 <span style={{ fontSize: 17 }}>
-                  <span style={{ fontFamily: "KaTeX_Main, serif"}}>PC1 = <strong style={{ color: GOLD }}>{pc1.toFixed(4)}</strong>,&ensp;</span>
-                  <span style={{ fontFamily: "KaTeX_Main, serif"}}>PC2 = <strong style={{ color: BLUE }}>{pc2.toFixed(4)}</strong></span>
+                  <span style={{ fontFamily: "KaTeX_Main, serif"}}>p<sub style={{ fontSize: "0.75em" }}>pc1</sub> = <strong style={{ color: GOLD, fontSize: 17 }}>{pc1.toFixed(4)}</strong>,&ensp;</span>
+                  <span style={{ fontFamily: "KaTeX_Main, serif"}}>p<sub style={{ fontSize: "0.75em" }}>pc2</sub> = <strong style={{ color: BLUE, fontSize: 17 }}>{pc2.toFixed(4)}</strong></span>
                   <span style={{ marginLeft: 12, color: "#ff3bff", fontSize: 15 }}> (highlighted in both plots above)</span>
                 </span>
               </div>

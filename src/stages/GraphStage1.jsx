@@ -310,7 +310,6 @@ export default function GraphStage1({ isDark, graph, setGraph, goToGraph2, goToP
           { name: "Row sums",               a: <InlineMath>{"d_i"}</InlineMath>, d: <InlineMath>{"d_i"}</InlineMath>, l: "0",            hi: [2] },
           { name: "Positive semi-definite", a: "Not always",               d: "Yes",                       l: "Yes",                       hi: [0] },
           { name: "Smallest eigenvalue",    a: "can be < 0",               d: "0",                         l: "0",                         hi: [0] },
-          { name: "Largest eigenvalue",     a: <><InlineMath>{"\\leq"}</InlineMath> {maxDeg}</>,            d: String(maxDeg),              l: <><InlineMath>{"\\leq"}</InlineMath> {2 * maxDeg}</>, hi: [0, 1, 2] },
         ];
 
         return (
